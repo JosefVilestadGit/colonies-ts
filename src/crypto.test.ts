@@ -27,6 +27,20 @@ describe('Crypto', () => {
       const id = crypto.id('6d2fb6f546bacfd98c68769e61e0b44a697a30596c018a50e28200aa59b01c0a');
       expect(id).toBe('4fef2b5a82d134d058c1883c72d6d9caf77cd59ca82d73105017590dea3dcb87');
     });
+
+    it('should match Go crypto for executor key', () => {
+      const crypto = new Crypto();
+      // Executor key from GitHub Actions workflow
+      const id = crypto.id('ddf7f7791208083b6a9ed975a72684f6406a269cfa36f1b1c32045c0a71fff05');
+      expect(id).toBe('3fc05cf3df4b494e95d6a3d297a34f19938f7daa7422ab0d4f794454133341ac');
+    });
+
+    it('should match Go crypto for colony key', () => {
+      const crypto = new Crypto();
+      // Colony key from GitHub Actions workflow
+      const id = crypto.id('ba949fa134981372d6da62b6a56f336ab4d843b22c02a4257dcf7d0d73097514');
+      expect(id).toBe('4787a5071856a4acf702b2ffcea422e3237a679c681314113d86139461290cf4');
+    });
   });
 
   describe('jacobianAdd', () => {
