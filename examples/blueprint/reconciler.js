@@ -109,6 +109,29 @@ async function registerExecutor() {
   }
 }
 
+async function loadExistingDeviceStates() {
+  console.log('Loading existing device states from ColonyOS...');
+  try {
+    client.setPrivateKey(config.executorPrvKey || config.colonyPrvKey);
+    const blueprints = await client.getBlueprints(config.colonyName);
+
+    if (blueprints && blueprints.length > 0) {
+      for (const bp of blueprints) {
+        const name = bp.metadata?.name;
+        if (name && bp.status && Object.keys(bp.status).length > 0) {
+          deviceStates.set(name, bp.status);
+          console.log(`  Loaded state for: ${name}`);
+        }
+      }
+      console.log(`Loaded ${deviceStates.size} device state(s)`);
+    } else {
+      console.log('No existing devices found');
+    }
+  } catch (error) {
+    console.error('Failed to load existing states:', error.message);
+  }
+}
+
 async function simulateDevice(deviceName, spec) {
   // Simulate a short delay for "applying" changes
   await new Promise(resolve => setTimeout(resolve, 500));
@@ -231,6 +254,7 @@ async function main() {
   console.log(`WebSocket: ws://0.0.0.0:${config.wsPort}`);
 
   await registerExecutor();
+  await loadExistingDeviceStates();
   await reconcileLoop();
 }
 
