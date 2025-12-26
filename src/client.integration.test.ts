@@ -783,23 +783,27 @@ describe('ColoniesClient Integration Tests', () => {
   });
 
   describe('Blueprint Operations', () => {
-    const blueprintDefName = 'home-device-def-' + Date.now();
-    const blueprintName = 'test-light-' + Date.now();
+    // Use unique kind per test run to avoid conflicts (server may only allow one definition per kind)
+    let blueprintDefName: string;
+    let blueprintName: string;
+    let blueprintKind: string;
 
     // Ensure blueprint definition exists before each test (requires colony owner key)
     beforeEach(async () => {
+      // Generate unique names and kind for this test
+      const timestamp = Date.now() + Math.random().toString(36).substring(7);
+      blueprintDefName = 'home-device-def-' + timestamp;
+      blueprintName = 'test-light-' + timestamp;
+      blueprintKind = 'HomeDevice-' + timestamp;
+
       client.setPrivateKey(TEST_CONFIG.colonyPrvKey);
-      try {
-        await client.addBlueprintDefinition({
-          kind: 'HomeDevice',
-          metadata: {
-            name: blueprintDefName,
-            colonyname: TEST_CONFIG.colonyName,
-          },
-        });
-      } catch {
-        // May already exist
-      }
+      await client.addBlueprintDefinition({
+        kind: blueprintKind,
+        metadata: {
+          name: blueprintDefName,
+          colonyname: TEST_CONFIG.colonyName,
+        },
+      });
     });
 
     afterEach(async () => {
@@ -826,7 +830,7 @@ describe('ColoniesClient Integration Tests', () => {
       // Definition was created in beforeEach, just verify we can get it
       const retrievedDef = await client.getBlueprintDefinition(TEST_CONFIG.colonyName, blueprintDefName);
       expect(retrievedDef).toBeDefined();
-      expect(retrievedDef.kind).toBe('HomeDevice');
+      expect(retrievedDef.kind).toBe(blueprintKind);
     });
 
     it('should list blueprint definitions (Colony Owner Key)', async () => {
@@ -857,7 +861,7 @@ describe('ColoniesClient Integration Tests', () => {
       client.setPrivateKey(TEST_CONFIG.executorPrvKey);
 
       const blueprint = {
-        kind: 'HomeDevice',
+        kind: blueprintKind,
         metadata: {
           name: blueprintName,
           colonyname: TEST_CONFIG.colonyName,
@@ -879,7 +883,7 @@ describe('ColoniesClient Integration Tests', () => {
       // Get it back
       const retrieved = await client.getBlueprint(TEST_CONFIG.colonyName, blueprintName);
       expect(retrieved).toBeDefined();
-      expect(retrieved.kind).toBe('HomeDevice');
+      expect(retrieved.kind).toBe(blueprintKind);
       expect(retrieved.spec.power).toBe(true);
       expect(retrieved.spec.brightness).toBe(80);
     });
@@ -889,7 +893,7 @@ describe('ColoniesClient Integration Tests', () => {
 
       // Add a blueprint
       const blueprint = {
-        kind: 'HomeDevice',
+        kind: blueprintKind,
         metadata: {
           name: blueprintName,
           colonyname: TEST_CONFIG.colonyName,
@@ -917,7 +921,7 @@ describe('ColoniesClient Integration Tests', () => {
 
       // Add initial blueprint
       const blueprint = {
-        kind: 'HomeDevice',
+        kind: blueprintKind,
         metadata: {
           name: blueprintName,
           colonyname: TEST_CONFIG.colonyName,
@@ -954,7 +958,7 @@ describe('ColoniesClient Integration Tests', () => {
 
       // Add a blueprint
       const blueprint = {
-        kind: 'HomeDevice',
+        kind: blueprintKind,
         metadata: {
           name: blueprintName,
           colonyname: TEST_CONFIG.colonyName,
@@ -989,7 +993,7 @@ describe('ColoniesClient Integration Tests', () => {
 
       // Add a blueprint
       const blueprint = {
-        kind: 'HomeDevice',
+        kind: blueprintKind,
         metadata: {
           name: blueprintName,
           colonyname: TEST_CONFIG.colonyName,
