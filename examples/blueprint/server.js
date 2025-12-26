@@ -4,13 +4,12 @@
  * A simple Express server that:
  * - Serves the static web UI
  * - Provides REST API endpoints for blueprint operations
- * - Proxies WebSocket connections to the reconciler
  * - Connects to ColonyOS server for blueprint management
+ *
+ * Real-time updates: browser connects directly to reconciler WebSocket on port 46701
  */
 
 import express from 'express';
-import { createServer } from 'http';
-import { WebSocketServer, WebSocket } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { ColoniesClient } from 'colonies-ts';
@@ -47,10 +46,13 @@ app.use(express.static(join(__dirname, 'public')));
 
 // API: Get configuration info
 app.get('/api/config', (req, res) => {
+  // Derive reconciler host from request (same server, different port)
+  const host = req.get('host')?.split(':')[0] || 'localhost';
   res.json({
     colonyName: config.colonyName,
     serverHost: config.colonies.host,
     serverPort: config.colonies.port,
+    reconcilerWsUrl: `ws://${host}:46701`,
   });
 });
 
@@ -188,57 +190,10 @@ app.post('/api/devices/:name/reconcile', async (req, res) => {
   }
 });
 
-// Create HTTP server
-const server = createServer(app);
-
-// WebSocket proxy to reconciler
-const reconcilerWsUrl = process.env.RECONCILER_WS_URL || 'ws://localhost:3001';
-const wss = new WebSocketServer({ server });
-
-wss.on('connection', (clientWs, req) => {
-  console.log(`Browser WebSocket connected from ${req.socket.remoteAddress}`);
-
-  // Connect to reconciler
-  const reconcilerWs = new WebSocket(reconcilerWsUrl);
-
-  reconcilerWs.on('open', () => {
-    console.log('Connected to reconciler WebSocket');
-  });
-
-  reconcilerWs.on('message', (data) => {
-    // Forward reconciler messages to browser
-    if (clientWs.readyState === WebSocket.OPEN) {
-      clientWs.send(data.toString());
-    }
-  });
-
-  reconcilerWs.on('close', () => {
-    console.log('Reconciler WebSocket closed');
-    clientWs.close();
-  });
-
-  reconcilerWs.on('error', (error) => {
-    console.error('Reconciler WebSocket error:', error.message);
-    clientWs.close();
-  });
-
-  clientWs.on('message', (data) => {
-    // Forward browser messages to reconciler
-    if (reconcilerWs.readyState === WebSocket.OPEN) {
-      reconcilerWs.send(data.toString());
-    }
-  });
-
-  clientWs.on('close', () => {
-    console.log('Browser WebSocket closed');
-    reconcilerWs.close();
-  });
-});
-
-// Start server (bind to all interfaces)
-server.listen(config.port, '0.0.0.0', () => {
+// Start server
+app.listen(config.port, '0.0.0.0', () => {
   console.log(`Home Automation Web UI running at http://0.0.0.0:${config.port}`);
-  console.log(`WebSocket proxy to reconciler at ${reconcilerWsUrl}`);
   console.log(`Connected to ColonyOS at ${config.colonies.host}:${config.colonies.port}`);
   console.log(`Colony: ${config.colonyName}`);
+  console.log(`Real-time: browser connects directly to reconciler on port 46701`);
 });

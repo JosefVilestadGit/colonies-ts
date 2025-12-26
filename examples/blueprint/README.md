@@ -24,10 +24,12 @@ flowchart LR
 
     subgraph Reconciler
         Executor[home-reconciler]
+        WS[WebSocket Server]
         Devices[Simulated Devices]
     end
 
     Browser --> Express
+    Browser <-.->|WebSocket| WS
     Express --> Static
     Express --> API
     API <--> Server
@@ -36,6 +38,15 @@ flowchart LR
     Executor --> Server
     Executor --> Devices
 ```
+
+### Real-Time Updates
+
+The browser connects directly to the reconciler's WebSocket (port 46701) for instant updates:
+
+1. **Browser** connects to `ws://<host>:46701`
+2. **Reconciler** sends current device states on connect
+3. When a device is reconciled, the reconciler broadcasts the update
+4. **Browser** receives updates instantly without polling
 
 ## Reconciliation Flow
 
@@ -231,46 +242,125 @@ The main screen shows all configured devices as cards:
 
 ## Using the Colonies CLI
 
-You can also manage devices using the colonies CLI:
+You can manage devices entirely from the command line using the `colonies` CLI.
 
-### Add the blueprint definition
+### Blueprint Definition Commands
 
 ```bash
-colonies blueprintdef add --spec home-device-def.json
+# List all blueprint definitions
+colonies blueprint definition ls
+
+# Add a new definition
+colonies blueprint definition add --spec home-device-def.json
+
+# Get definition details
+colonies blueprint definition get --name home-device-def
+
+# Remove a definition
+colonies blueprint definition remove --name home-device-def
 ```
 
-### Add a device
+### Blueprint (Device) Commands
 
 ```bash
+# List all blueprints/devices
+colonies blueprint ls
+
+# Add a new device from JSON file
 colonies blueprint add --spec blueprints/living-room-light.json
+
+# Get device details (shows spec and status)
+colonies blueprint get --name living-room-light
+
+# Remove a device
+colonies blueprint remove --name living-room-light
 ```
 
-### Set device state
+### Setting Device State
+
+The `set` command uses dot notation for nested fields:
 
 ```bash
 # Turn on a light
-colonies blueprint set --name living-room-light --key spec.power --value true
+colonies blueprint set --name bedroom-light --key spec.power --value true
 
-# Set brightness
-colonies blueprint set --name living-room-light --key spec.brightness --value 80
+# Turn off a light
+colonies blueprint set --name bedroom-light --key spec.power --value false
+
+# Set brightness (0-100)
+colonies blueprint set --name bedroom-light --key spec.brightness --value 75
+
+# Set thermostat temperature
+colonies blueprint set --name living-room-thermostat --key spec.temperature --value 22
+
+# Change room name
+colonies blueprint set --name bedroom-light --key spec.room --value "Master Bedroom"
 ```
 
-### Trigger reconciliation
+### Triggering Reconciliation
 
 ```bash
-colonies blueprint reconcile --name living-room-light
+# Normal reconciliation (only if out of sync)
+colonies blueprint reconcile --name bedroom-light
+
+# Force reconciliation (always applies, useful for testing)
+colonies blueprint reconcile --name bedroom-light --force
 ```
 
-### View device status
+### Viewing Logs
 
 ```bash
-colonies blueprint get --name living-room-light
+# View reconciler logs
+colonies blueprint log --name bedroom-light
+
+# View blueprint history
+colonies blueprint history --name bedroom-light
 ```
 
-### List all devices
+### Diagnosing Issues
 
 ```bash
-colonies blueprint ls
+# Run diagnostic checks on a blueprint
+colonies blueprint doctor --name bedroom-light
+```
+
+### Complete Example Workflow
+
+```bash
+# 1. Source environment
+source /path/to/colonies/docker-compose.env
+
+# 2. Create a new light device
+cat > /tmp/kitchen-light.json << 'EOF'
+{
+  "kind": "HomeDevice",
+  "metadata": { "name": "kitchen-light", "colonyname": "dev" },
+  "handler": { "executortype": "home-reconciler" },
+  "spec": {
+    "deviceType": "light",
+    "room": "Kitchen",
+    "power": false,
+    "brightness": 50
+  }
+}
+EOF
+
+colonies blueprint add --spec /tmp/kitchen-light.json
+
+# 3. Turn on the light
+colonies blueprint set --name kitchen-light --key spec.power --value true
+
+# 4. Check the status
+colonies blueprint get --name kitchen-light
+
+# 5. Set brightness to 80%
+colonies blueprint set --name kitchen-light --key spec.brightness --value 80
+
+# 6. Force reconciliation
+colonies blueprint reconcile --name kitchen-light --force
+
+# 7. Verify the status matches spec
+colonies blueprint get --name kitchen-light
 ```
 
 ## File Structure
@@ -355,6 +445,7 @@ Example light:
 | `COLONIES_COLONY_PRVKEY` | Colony owner private key | (required) |
 | `COLONIES_PRVKEY` | Executor private key | (required) |
 | `WEB_PORT` | Web server port | 3000 |
+| `RECONCILER_WS_PORT` | Reconciler WebSocket port | 46701 |
 
 ## Troubleshooting
 

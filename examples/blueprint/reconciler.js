@@ -24,7 +24,7 @@ const config = {
     port: parseInt(process.env.COLONIES_SERVER_HTTP_PORT || process.env.COLONIES_SERVER_PORT || '50080', 10),
     tls: (process.env.COLONIES_SERVER_HTTP_TLS ?? process.env.COLONIES_SERVER_TLS ?? 'false') === 'true',
   },
-  wsPort: parseInt(process.env.RECONCILER_WS_PORT || '3001', 10),
+  wsPort: parseInt(process.env.RECONCILER_WS_PORT || '46701', 10),
   colonyName: process.env.COLONIES_COLONY_NAME || 'dev',
   colonyPrvKey: process.env.COLONIES_COLONY_PRVKEY,
   executorPrvKey: process.env.COLONIES_PRVKEY,
@@ -56,69 +56,42 @@ const httpServer = createServer((req, res) => {
   }
 });
 
-httpServer.on('connection', (socket) => {
-  console.log(`New TCP connection from ${socket.remoteAddress}:${socket.remotePort}`);
-});
 
-// WebSocket server attached to HTTP server
-const wss = new WebSocketServer({
-  server: httpServer,
-  perMessageDeflate: false
-});
+// WebSocket server (noServer mode for reliable connections)
+const wss = new WebSocketServer({ noServer: true });
 const clients = new Set();
 
 httpServer.on('error', (error) => {
   console.error('HTTP server error:', error);
 });
 
-httpServer.on('upgrade', (req, socket, head) => {
-  console.log(`HTTP upgrade request from ${req.socket.remoteAddress} for ${req.url}`);
+httpServer.on('upgrade', (request, socket, head) => {
+  console.log(`WebSocket upgrade from ${request.socket.remoteAddress}`);
+
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    clients.add(ws);
+    console.log(`Client connected (${clients.size} total)`);
+
+    // Send current state to new client
+    const allStates = {};
+    for (const [name, state] of deviceStates) {
+      allStates[name] = state;
+    }
+    ws.send(JSON.stringify({ type: 'init', devices: allStates }));
+
+    ws.on('close', (code, reason) => {
+      clients.delete(ws);
+      console.log(`Client disconnected (${clients.size} remaining) code=${code} reason=${reason}`);
+    });
+
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error.message);
+    });
+  });
 });
 
 httpServer.listen(config.wsPort, '0.0.0.0', () => {
   console.log(`WebSocket server listening on 0.0.0.0:${config.wsPort}`);
-});
-
-wss.on('headers', (headers, req) => {
-  console.log(`WebSocket handshake response to ${req.socket.remoteAddress}`);
-});
-
-wss.on('error', (error) => {
-  console.error('WebSocket server error:', error);
-});
-
-wss.on('connection', (ws, req) => {
-  clients.add(ws);
-  const clientAddr = req.socket.remoteAddress;
-  console.log(`UI client connected from ${clientAddr} (${clients.size} total)`);
-
-  // Send current state to new client
-  const allStates = {};
-  for (const [name, state] of deviceStates) {
-    allStates[name] = state;
-  }
-  ws.send(JSON.stringify({ type: 'init', devices: allStates }));
-
-  // Ping every 30 seconds to keep connection alive
-  const pingInterval = setInterval(() => {
-    if (ws.readyState === 1) {
-      ws.ping();
-    }
-  }, 30000);
-
-  ws.on('pong', () => {
-    // Connection is alive
-  });
-
-  ws.on('close', (code, reason) => {
-    clearInterval(pingInterval);
-    clients.delete(ws);
-    console.log(`UI client disconnected from ${clientAddr}. Code: ${code}, Reason: ${reason || 'none'} (${clients.size} remaining)`);
-  });
-
-  ws.on('error', (error) => {
-    console.error(`WebSocket error for client ${clientAddr}:`, error.message);
-  });
 });
 
 function broadcastDeviceUpdate(deviceName, status) {

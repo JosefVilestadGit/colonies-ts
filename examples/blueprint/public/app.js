@@ -22,22 +22,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   connectWebSocket();
 });
 
-// WebSocket connection via web server proxy (same port as UI)
-function connectWebSocket() {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}`;
+// Clean close on page unload to prevent alternating connection issues
+window.addEventListener('beforeunload', () => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.close(1000, 'page unload');
+  }
+});
 
-  console.log('Connecting to WebSocket at:', wsUrl);
+// WebSocket connection directly to reconciler
+function connectWebSocket() {
+  const wsUrl = config.reconcilerWsUrl;
+  if (!wsUrl) {
+    console.error('No reconcilerWsUrl in config');
+    return;
+  }
+
+  console.log('Connecting to reconciler at:', wsUrl);
 
   try {
     ws = new WebSocket(wsUrl);
+    console.log('WebSocket created, readyState:', ws.readyState);
   } catch (error) {
     console.error('Failed to create WebSocket:', error);
     return;
   }
 
   ws.onopen = () => {
-    console.log('Connected to reconciler WebSocket');
+    console.log('WebSocket OPEN, readyState:', ws.readyState);
     document.getElementById('connection-status').textContent =
       `Connected to ${config.colonyName} @ ${config.serverHost}:${config.serverPort} (live)`;
     document.getElementById('connection-status').classList.add('connected');
@@ -63,14 +74,14 @@ function connectWebSocket() {
   };
 
   ws.onclose = (event) => {
-    console.log('Reconciler WebSocket closed. Code:', event.code, 'Reason:', event.reason, 'Clean:', event.wasClean);
-    document.getElementById('connection-status').textContent = 'Reconnecting to reconciler...';
+    console.log('WebSocket CLOSED, code:', event.code, 'reason:', event.reason, 'wasClean:', event.wasClean);
+    document.getElementById('connection-status').textContent = 'Reconnecting...';
     document.getElementById('connection-status').classList.remove('connected');
     setTimeout(connectWebSocket, 2000);
   };
 
   ws.onerror = (event) => {
-    console.error('Reconciler WebSocket error - connection to port 3001 failed. Is the reconciler running?');
+    console.error('WebSocket error:', event);
   };
 }
 
@@ -270,50 +281,51 @@ function renderDeviceCard(deviceType, spec, status, hasStatus) {
 function renderLightCard(spec, status, hasStatus) {
   const desiredOn = spec.power === true;
   const actualOn = hasStatus ? status.power === true : null;
-  const desiredBrightness = spec.brightness || 100;
+  const desiredBrightness = spec.brightness ?? 100;
   const actualBrightness = hasStatus ? (status.brightness || 0) : null;
 
   // Show actual state if available, otherwise show desired
   const displayOn = hasStatus ? actualOn : desiredOn;
   const displayBrightness = hasStatus ? actualBrightness : desiredBrightness;
 
-  const glowIntensity = displayOn ? (displayBrightness / 100) : 0;
-  const bulbColor = displayOn ? `rgba(255, 220, 100, ${0.5 + glowIntensity * 0.5})` : '#444';
-  const glowSize = displayOn ? Math.floor(10 + glowIntensity * 20) : 0;
+  const brightness = displayBrightness || 0;
+  // Minimum intensity of 0.15 when on, so bulb is visible even at 0% brightness
+  const intensity = displayOn ? Math.max(0.15, brightness / 100) : 0;
 
   return `
     <div class="light-visual">
       <svg viewBox="0 0 100 120" class="light-bulb">
-        <!-- Glow effect -->
+        <defs>
+          <radialGradient id="bulb-grad-card" cx="50%" cy="40%" r="50%">
+            <stop offset="0%" stop-color="${displayOn ? `rgba(255,255,200,${0.9 * intensity})` : '#555'}"/>
+            <stop offset="50%" stop-color="${displayOn ? `rgba(255,200,80,${0.8 * intensity})` : '#444'}"/>
+            <stop offset="100%" stop-color="${displayOn ? `rgba(200,150,50,${0.6 * intensity})` : '#333'}"/>
+          </radialGradient>
+          <linearGradient id="base-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#aaa"/>
+            <stop offset="100%" stop-color="#555"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Glass bulb -->
+        <ellipse cx="50" cy="45" rx="32" ry="38" fill="url(#bulb-grad-card)" stroke="#888" stroke-width="1.5"/>
+
+        <!-- Highlight -->
+        <ellipse cx="38" cy="32" rx="8" ry="12" fill="rgba(255,255,255,0.15)"/>
+
+        <!-- Filament -->
         ${displayOn ? `
-          <defs>
-            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="${glowSize}" result="coloredBlur"/>
-              <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-              </feMerge>
-            </filter>
-          </defs>
+          <path d="M42 50 Q50 60 58 50" stroke="rgba(255,180,50,${0.5 + intensity * 0.5})" stroke-width="2" fill="none"/>
+          <line x1="45" y1="55" x2="45" y2="70" stroke="rgba(255,180,50,${0.3 + intensity * 0.3})" stroke-width="1"/>
+          <line x1="55" y1="55" x2="55" y2="70" stroke="rgba(255,180,50,${0.3 + intensity * 0.3})" stroke-width="1"/>
         ` : ''}
 
-        <!-- Bulb -->
-        <ellipse cx="50" cy="45" rx="35" ry="40"
-          fill="${bulbColor}"
-          ${displayOn ? 'filter="url(#glow)"' : ''}
-          stroke="#666" stroke-width="2"/>
-
-        <!-- Filament lines when on -->
-        ${displayOn ? `
-          <path d="M35 40 Q50 55 65 40" stroke="rgba(255,200,50,0.8)" stroke-width="2" fill="none"/>
-          <path d="M40 50 Q50 60 60 50" stroke="rgba(255,200,50,0.6)" stroke-width="1.5" fill="none"/>
-        ` : ''}
-
-        <!-- Base -->
-        <rect x="35" y="85" width="30" height="8" fill="#888" rx="2"/>
-        <rect x="38" y="93" width="24" height="5" fill="#666" rx="1"/>
-        <rect x="40" y="98" width="20" height="5" fill="#555" rx="1"/>
-        <rect x="42" y="103" width="16" height="8" fill="#444" rx="2"/>
+        <!-- Screw base -->
+        <path d="M35 83 L38 78 L62 78 L65 83 Z" fill="url(#base-grad)"/>
+        <rect x="36" y="83" width="28" height="6" fill="#777" rx="1"/>
+        <rect x="38" y="89" width="24" height="5" fill="#666" rx="1"/>
+        <rect x="40" y="94" width="20" height="5" fill="#555" rx="1"/>
+        <rect x="42" y="99" width="16" height="8" fill="#444" rx="2"/>
       </svg>
       <div class="light-info">
         <span class="power-state ${displayOn ? 'on' : 'off'}">${displayOn ? 'ON' : 'OFF'}</span>
@@ -519,7 +531,7 @@ function renderDeviceVisualization(device) {
 function renderLightVisualization(spec, status, hasStatus) {
   const desiredOn = spec.power === true;
   const actualOn = hasStatus ? status.power === true : null;
-  const desiredBrightness = spec.brightness || 100;
+  const desiredBrightness = spec.brightness ?? 100;
   const actualBrightness = hasStatus ? status.brightness : null;
 
   return `
@@ -541,38 +553,42 @@ function renderLightVisualization(spec, status, hasStatus) {
 }
 
 function renderLargeLightBulb(isOn, brightness, type) {
-  const glowIntensity = isOn ? (brightness / 100) : 0;
-  const bulbColor = isOn ? `rgba(255, 220, 100, ${0.5 + glowIntensity * 0.5})` : '#444';
-  const glowSize = isOn ? Math.floor(5 + glowIntensity * 15) : 0;
+  // Minimum intensity of 0.15 when on, so bulb is visible even at 0% brightness
+  const intensity = isOn ? Math.max(0.15, brightness / 100) : 0;
 
   return `
     <svg viewBox="0 0 100 130" class="large-light-bulb">
+      <defs>
+        <radialGradient id="bulb-grad-${type}" cx="50%" cy="40%" r="50%">
+          <stop offset="0%" stop-color="${isOn ? `rgba(255,255,220,${0.95 * intensity})` : '#555'}"/>
+          <stop offset="40%" stop-color="${isOn ? `rgba(255,210,100,${0.85 * intensity})` : '#444'}"/>
+          <stop offset="100%" stop-color="${isOn ? `rgba(180,140,60,${0.6 * intensity})` : '#333'}"/>
+        </radialGradient>
+        <linearGradient id="base-grad-${type}" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#aaa"/>
+          <stop offset="100%" stop-color="#555"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Glass bulb -->
+      <ellipse cx="50" cy="48" rx="38" ry="44" fill="url(#bulb-grad-${type})" stroke="#888" stroke-width="2"/>
+
+      <!-- Highlight -->
+      <ellipse cx="35" cy="32" rx="10" ry="16" fill="rgba(255,255,255,0.12)"/>
+
+      <!-- Filament -->
       ${isOn ? `
-        <defs>
-          <filter id="glow-${type}" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="${glowSize}" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
+        <path d="M38 55 Q50 70 62 55" stroke="rgba(255,180,50,${0.5 + intensity * 0.5})" stroke-width="2.5" fill="none"/>
+        <line x1="43" y1="62" x2="43" y2="78" stroke="rgba(255,180,50,${0.3 + intensity * 0.4})" stroke-width="1.5"/>
+        <line x1="57" y1="62" x2="57" y2="78" stroke="rgba(255,180,50,${0.3 + intensity * 0.4})" stroke-width="1.5"/>
       ` : ''}
 
-      <ellipse cx="50" cy="50" rx="40" ry="45"
-        fill="${bulbColor}"
-        ${isOn ? `filter="url(#glow-${type})"` : ''}
-        stroke="#666" stroke-width="2"/>
-
-      ${isOn ? `
-        <path d="M30 45 Q50 65 70 45" stroke="rgba(255,200,50,0.8)" stroke-width="3" fill="none"/>
-        <path d="M35 55 Q50 70 65 55" stroke="rgba(255,200,50,0.6)" stroke-width="2" fill="none"/>
-      ` : ''}
-
-      <rect x="35" y="95" width="30" height="8" fill="#888" rx="2"/>
-      <rect x="38" y="103" width="24" height="5" fill="#666" rx="1"/>
-      <rect x="40" y="108" width="20" height="5" fill="#555" rx="1"/>
-      <rect x="42" y="113" width="16" height="10" fill="#444" rx="2"/>
+      <!-- Screw base -->
+      <path d="M32 92 L36 86 L64 86 L68 92 Z" fill="url(#base-grad-${type})"/>
+      <rect x="34" y="92" width="32" height="7" fill="#777" rx="1"/>
+      <rect x="36" y="99" width="28" height="6" fill="#666" rx="1"/>
+      <rect x="38" y="105" width="24" height="6" fill="#555" rx="1"/>
+      <rect x="40" y="111" width="20" height="10" fill="#444" rx="2"/>
     </svg>
     <div class="visual-label">
       <span class="${isOn ? 'on' : 'off'}">${isOn ? 'ON' : 'OFF'}</span>
