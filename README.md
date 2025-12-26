@@ -24,19 +24,20 @@ Traditional request-response pattern for discrete tasks. Submit a job, an execut
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Server
+    participant Colonies Server
     participant Executor
 
-    Client->>Server: submitFunctionSpec()
-    Server-->>Client: Process (WAITING)
+    Client->>Colonies Server: submitFunctionSpec()
+    Colonies Server-->>Client: Process (WAITING)
+    Client->>Colonies Server: subscribeProcessWS(SUCCESS)
 
-    Executor->>Server: assign()
-    Server-->>Executor: Process (RUNNING)
+    Executor->>Colonies Server: assign()
+    Colonies Server-->>Executor: Process (RUNNING)
 
     Note over Executor: Execute task
 
-    Executor->>Server: closeProcess(output)
-    Server-->>Client: Process (SUCCESS)
+    Executor->>Colonies Server: closeProcess(output)
+    Colonies Server-->>Client: Process (SUCCESS)
 ```
 
 ```typescript
@@ -51,9 +52,13 @@ const process = await client.submitFunctionSpec({
   maxexectime: 300,
 });
 
-// Wait for result
-const result = await client.getProcess(process.processid);
-console.log('Output:', result.output);
+// Subscribe to process completion
+client.subscribeProcessWS(
+  'my-colony', process.processid, ProcessState.SUCCESS, 300,
+  (result) => console.log('Output:', result.output),
+  console.error,
+  () => {}
+);
 ```
 
 ### 2. Blueprint Reconciliation
@@ -63,21 +68,26 @@ Declarative desired-state pattern for managing resources. Define the desired sta
 ```mermaid
 sequenceDiagram
     participant User
-    participant Server
+    participant Colonies Server
     participant Reconciler
     participant Device
 
-    User->>Server: Set desired state (spec)
-    Server->>Reconciler: Trigger reconcile process
+    User->>Colonies Server: updateBlueprint(spec)
+    Note over Colonies Server: Generation++
 
-    Reconciler->>Server: Get blueprint
-    Server-->>Reconciler: spec + status
+    Colonies Server->>Colonies Server: Create reconcile process
+    Reconciler->>Colonies Server: assign()
+    Colonies Server-->>Reconciler: Process (RUNNING)
+
+    Reconciler->>Colonies Server: getBlueprint()
+    Colonies Server-->>Reconciler: spec + status
 
     Reconciler->>Device: Apply changes
-    Device-->>Reconciler: New state
+    Device-->>Reconciler: Current state
 
-    Reconciler->>Server: Update status
-    Note over Server: spec == status
+    Reconciler->>Colonies Server: updateBlueprintStatus()
+    Reconciler->>Colonies Server: closeProcess()
+    Note over Colonies Server: spec == status
 ```
 
 ```typescript
@@ -104,24 +114,29 @@ Bidirectional streaming for interactive workloads like chat, live data, or long-
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Server
+    participant Colonies Server
     participant Executor
 
-    Client->>Server: Submit with channels
-    Executor->>Server: Assign process
+    Client->>Colonies Server: submitFunctionSpec(channels)
+    Colonies Server-->>Client: Process (WAITING)
+    Client->>Colonies Server: subscribeProcessWS(RUNNING)
 
+    Executor->>Colonies Server: assign()
+    Colonies Server-->>Executor: Process (RUNNING)
+    Colonies Server-->>Client: Process (RUNNING)
+
+    Client->>Colonies Server: subscribeChannelWS()
     Note over Client,Executor: WebSocket streams open
 
-    Client->>Server: channelAppend("prompt")
-    Server-->>Executor: Message
+    Client->>Colonies Server: channelAppend("prompt")
+    Colonies Server-->>Executor: Message
 
     loop Streaming response
-        Executor->>Server: channelAppend("token")
-        Server-->>Client: Message
+        Executor->>Colonies Server: channelAppend("token")
+        Colonies Server-->>Client: Message
     end
 
-    Executor->>Server: channelAppend(type: "end")
-    Server-->>Client: Stream complete
+    Executor->>Colonies Server: closeProcess()
 ```
 
 ```typescript
@@ -133,21 +148,23 @@ const process = await client.submitFunctionSpec({
   channels: ['chat'],
 });
 
-// Subscribe to streaming response
-client.subscribeChannelWS(
-  process.processid, 'chat', 0, 300,
-  (entries) => {
-    for (const entry of entries) {
-      if (entry.type === 'end') return;
-      process.stdout.write(entry.payload);
-    }
+// Wait for process to be assigned, then subscribe to channel
+client.subscribeProcessWS(
+  'ai', process.processid, ProcessState.RUNNING, 60,
+  (runningProcess) => {
+    // Now subscribe to channel for streaming
+    client.subscribeChannelWS(
+      runningProcess.processid, 'chat', 0, 300,
+      (entries) => entries.forEach(e => console.log(e.payload)),
+      console.error,
+      () => {}
+    );
+    // Send message
+    client.channelAppend(runningProcess.processid, 'chat', 1, 0, 'Hello!');
   },
   console.error,
   () => {}
 );
-
-// Send message
-await client.channelAppend(process.processid, 'chat', 1, 0, 'Hello!');
 ```
 
 ## Crypto
@@ -224,31 +241,62 @@ new ColoniesClient({
 })
 ```
 
-#### Methods
+#### Colony & Server
 
 | Method | Description |
 |--------|-------------|
 | `setPrivateKey(key)` | Set the private key for signing requests |
 | `getColonies()` | List all colonies |
 | `getStatistics()` | Get server statistics |
+| `addColony(colony)` | Add a new colony |
+| `removeColony(colonyName)` | Remove a colony |
+
+#### Executors
+
+| Method | Description |
+|--------|-------------|
 | `getExecutors(colonyName)` | List executors in a colony |
+| `getExecutor(colonyName, executorName)` | Get a specific executor |
+| `addExecutor(executor)` | Register a new executor |
+| `approveExecutor(colonyName, executorName)` | Approve an executor |
+| `removeExecutor(colonyName, executorName)` | Remove an executor |
+
+#### Processes
+
+| Method | Description |
+|--------|-------------|
 | `submitFunctionSpec(spec)` | Submit a process |
 | `assign(colonyName, timeout, prvKey)` | Assign a process to execute |
 | `getProcess(processId)` | Get process details |
-| `getProcesses(colonyName, count, state)` | List processes |
+| `getProcesses(colonyName, count, state)` | List processes by state |
 | `closeProcess(processId, output)` | Close a process successfully |
+| `failProcess(processId, errors)` | Close a process with failure |
 | `removeProcess(processId)` | Remove a process |
 | `removeAllProcesses(colonyName, state)` | Remove all processes |
-| `submitWorkflowSpec(spec)` | Submit a workflow |
+
+#### Workflows
+
+| Method | Description |
+|--------|-------------|
+| `submitWorkflowSpec(spec)` | Submit a workflow (DAG) |
 | `getProcessGraph(graphId)` | Get workflow details |
-| `getCrons(colonyName)` | List cron jobs |
-| `addCron(cronSpec)` | Add a cron job |
-| `getGenerators(colonyName)` | List generators |
-| `addGenerator(generatorSpec)` | Add a generator |
+| `getProcessGraphs(colonyName, count, state?)` | List workflows |
+| `removeProcessGraph(graphId)` | Remove a workflow |
+| `removeAllProcessGraphs(colonyName, state?)` | Remove all workflows |
+
+#### Channels
+
+| Method | Description |
+|--------|-------------|
 | `channelAppend(processId, channelName, seq, inReplyTo, payload)` | Send message to channel |
 | `channelRead(processId, channelName, afterSeq, limit)` | Read messages from channel |
 | `subscribeChannelWS(...)` | Subscribe to channel via WebSocket |
 | `subscribeProcessWS(...)` | Subscribe to process state changes |
+
+#### Blueprints
+
+| Method | Description |
+|--------|-------------|
 | `addBlueprintDefinition(definition)` | Add a blueprint definition |
 | `getBlueprintDefinition(colonyName, name)` | Get a blueprint definition |
 | `getBlueprintDefinitions(colonyName)` | List blueprint definitions |
@@ -260,6 +308,18 @@ new ColoniesClient({
 | `removeBlueprint(colonyName, name)` | Remove a blueprint |
 | `updateBlueprintStatus(colonyName, name, status)` | Update blueprint status |
 | `reconcileBlueprint(colonyName, name, force?)` | Trigger reconciliation |
+
+#### Crons & Generators
+
+| Method | Description |
+|--------|-------------|
+| `getCrons(colonyName)` | List cron jobs |
+| `getCron(cronId)` | Get a cron job |
+| `addCron(cronSpec)` | Add a cron job |
+| `removeCron(cronId)` | Remove a cron job |
+| `getGenerators(colonyName)` | List generators |
+| `getGenerator(generatorId)` | Get a generator |
+| `addGenerator(generatorSpec)` | Add a generator |
 
 ### ProcessState
 
