@@ -1,4 +1,4 @@
-# ColonyOS TypeScript/Javascript Client Library
+# ColonyOS TypeScript Library
 
 [![CI](https://github.com/colonyos/colonies-ts/actions/workflows/node.yml/badge.svg)](https://github.com/colonyos/colonies-ts/actions/workflows/node.yml)
 [![codecov](https://img.shields.io/codecov/c/github/colonyos/colonies-ts)](https://codecov.io/gh/colonyos/colonies-ts)
