@@ -376,6 +376,157 @@ interface MsgEntry {
 5. **Use inReplyTo** for request-response correlation in bidirectional communication
 6. **Close WebSocket connections** when done to free server resources
 
+## Sync Channels for Reliable Completion
+
+When a process closes, its channels are immediately cleaned up. This can cause race conditions where clients miss the final messages. Use a **sync channel** to ensure reliable completion.
+
+### The Problem
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    participant Executor
+
+    Executor->>Server: channelAppend(type="end")
+    Executor->>Server: close()
+    Note over Server: Channels deleted!
+
+    Client->>Server: channelRead()
+    Server-->>Client: Error: Channel not found
+```
+
+### The Solution: Acknowledgment Pattern
+
+Use a dedicated sync channel for the client to acknowledge receipt before the executor closes:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    participant Executor
+
+    Executor->>Server: channelAppend(type="end") on output
+    Server-->>Client: End message
+
+    Client->>Server: channelAppend("ack") on sync
+    Server-->>Executor: Ack message
+
+    Executor->>Server: close()
+    Note over Server: Safe to cleanup
+```
+
+### Implementation
+
+**Executor side** - wait for client ACK before closing:
+
+```typescript
+import { ColoniesClient } from 'colonies-ts';
+
+async function executorWithSync(client: ColoniesClient, prvKey: string) {
+  const process = await client.assign('my-colony', 10, prvKey);
+
+  // Do work and stream results...
+  await client.channelAppend(process.processid, 'output', 1, 0, 'Result 1');
+  await client.channelAppend(process.processid, 'output', 2, 0, 'Result 2');
+
+  // Send end message on output channel
+  await client.channelAppend(process.processid, 'output', 3, 0, '', 'end');
+
+  // Wait for client acknowledgment on sync channel
+  let ackReceived = false;
+  const startTime = Date.now();
+  const timeout = 30000; // 30 seconds
+
+  while (!ackReceived && Date.now() - startTime < timeout) {
+    const msgs = await client.channelRead(process.processid, 'sync', 0, 10);
+
+    if (msgs.some(m => m.payload === 'ack')) {
+      ackReceived = true;
+      break;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  if (!ackReceived) {
+    console.warn('Client did not acknowledge, closing anyway');
+  }
+
+  // Now safe to close - client has received all messages
+  await client.close(process.processid, prvKey);
+}
+```
+
+**Client side** - send ACK after receiving end message:
+
+```typescript
+import { ColoniesClient, ProcessState } from 'colonies-ts';
+
+async function clientWithSync(client: ColoniesClient) {
+  // Submit process with output and sync channels
+  const process = await client.submitFunctionSpec({
+    funcname: 'stream-task',
+    conditions: {
+      colonyname: 'my-colony',
+      executortype: 'my-executor',
+    },
+    maxwaittime: 60,
+    maxexectime: 300,
+    channels: ['output', 'sync'],  // Include sync channel
+  });
+
+  // Wait for process to start
+  await new Promise<void>((resolve, reject) => {
+    const ws = client.subscribeProcess(
+      'my-colony',
+      process.processid,
+      ProcessState.RUNNING,
+      60,
+      () => { ws.close(); resolve(); },
+      reject,
+      () => {}
+    );
+  });
+
+  // Subscribe to output channel
+  await new Promise<void>((resolve, reject) => {
+    const channelWs = client.subscribeChannel(
+      process.processid,
+      'output',
+      0,
+      60,
+      async (entries) => {
+        for (const entry of entries) {
+          if (entry.type === 'end') {
+            // Send acknowledgment on sync channel
+            await client.channelAppend(process.processid, 'sync', 1, 0, 'ack');
+            console.log('Sent ACK, all messages received');
+            channelWs.close();
+            resolve();
+            return;
+          }
+
+          console.log('Received:', entry.payload);
+        }
+      },
+      reject,
+      () => {}
+    );
+  });
+}
+```
+
+### When to Use Sync Channels
+
+Use sync channels when:
+
+- **Critical data**: You cannot afford to lose any messages
+- **Confirmation required**: The executor needs to know the client received everything
+- **Ordered shutdown**: Resources must be cleaned up in a specific order
+
+For simple streaming where occasional message loss is acceptable, the basic end message pattern is sufficient.
+
 ## Process States
 
 ```typescript
