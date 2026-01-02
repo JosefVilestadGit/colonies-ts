@@ -21,8 +21,8 @@ import { createServer } from 'http';
 const config = {
   colonies: {
     host: process.env.COLONIES_SERVER_HOST || 'localhost',
-    port: parseInt(process.env.COLONIES_SERVER_HTTP_PORT || process.env.COLONIES_SERVER_PORT || '50080', 10),
-    tls: (process.env.COLONIES_SERVER_HTTP_TLS ?? process.env.COLONIES_SERVER_TLS ?? 'false') === 'true',
+    port: parseInt(process.env.COLONIES_SERVER_PORT || '50080', 10),
+    tls: (process.env.COLONIES_TLS ?? 'false') === 'true',
   },
   wsPort: parseInt(process.env.RECONCILER_WS_PORT || '46701', 10),
   colonyName: process.env.COLONIES_COLONY_NAME || 'dev',

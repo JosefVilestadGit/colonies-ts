@@ -102,12 +102,6 @@ cd /path/to/colonies
 docker-compose up -d
 ```
 
-Verify the server is running:
-
-```bash
-colonies server check
-```
-
 ### 2. Source Environment Variables
 
 The environment variables contain the server connection details and private keys:
@@ -447,7 +441,7 @@ Example light:
 |----------|-------------|---------|
 | `COLONIES_SERVER_HOST` | ColonyOS server hostname | localhost |
 | `COLONIES_SERVER_PORT` | ColonyOS server port | 50080 |
-| `COLONIES_SERVER_TLS` | Enable TLS | false |
+| `COLONIES_TLS` | Enable TLS | false |
 | `COLONIES_COLONY_NAME` | Colony name | dev |
 | `COLONIES_COLONY_PRVKEY` | Colony owner private key | (required) |
 | `COLONIES_PRVKEY` | Executor private key | (required) |
@@ -539,5 +533,5 @@ If using TLS or a remote server:
 ```bash
 export COLONIES_SERVER_HOST=your-server.com
 export COLONIES_SERVER_PORT=443
-export COLONIES_SERVER_TLS=true
+export COLONIES_TLS=true
 ```

@@ -1114,6 +1114,16 @@ var ColoniesClient = class {
     };
     return this.sendRPC(this.createRPCMsg(msg));
   }
+  async getProcessesForWorkflow(processGraphId, colonyName, count = 100) {
+    const msg = {
+      msgtype: "getprocessesmsg",
+      processgraphid: processGraphId,
+      colonyname: colonyName,
+      count,
+      state: -1
+    };
+    return this.sendRPC(this.createRPCMsg(msg));
+  }
   async removeAllProcessGraphs(colonyName, state) {
     const msg = {
       msgtype: "removeallprocessgraphsmsg",
@@ -1191,6 +1201,13 @@ var ColoniesClient = class {
     };
     return this.sendRPC(this.createRPCMsg(msg));
   }
+  async runCron(cronId) {
+    const msg = {
+      msgtype: "runcronmsg",
+      cronid: cronId
+    };
+    return this.sendRPC(this.createRPCMsg(msg));
+  }
   // ==================== Generator Methods ====================
   async getGenerators(colonyName, count = 100) {
     const msg = {
@@ -1253,6 +1270,22 @@ var ColoniesClient = class {
       colonyname: colonyName,
       label
     };
+    return this.sendRPC(this.createRPCMsg(msg));
+  }
+  async getFile(colonyName, options) {
+    const msg = {
+      msgtype: "getfilemsg",
+      colonyname: colonyName
+    };
+    if ("fileId" in options) {
+      msg.fileid = options.fileId;
+    } else {
+      msg.name = options.name;
+      msg.label = options.label;
+      if (options.latest !== void 0) {
+        msg.latest = options.latest;
+      }
+    }
     return this.sendRPC(this.createRPCMsg(msg));
   }
   // ==================== Attribute Methods ====================
@@ -1550,6 +1583,21 @@ var ColoniesClient = class {
       name,
       force
     };
+    return this.sendRPC(this.createRPCMsg(msg));
+  }
+  /**
+   * Get the history of changes for a specific blueprint
+   * @param blueprintId - ID of the blueprint
+   * @param limit - Optional limit on number of history entries to retrieve
+   */
+  async getBlueprintHistory(blueprintId, limit) {
+    const msg = {
+      msgtype: "getblueprinthistorymsg",
+      blueprintid: blueprintId
+    };
+    if (limit !== void 0) {
+      msg.limit = limit;
+    }
     return this.sendRPC(this.createRPCMsg(msg));
   }
   /**
