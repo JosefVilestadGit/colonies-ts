@@ -2,6 +2,8 @@
 
 A complete home automation web app using ColonyOS blueprints for managing smart devices.
 
+![Home Automation](imgs/home_automation.png)
+
 ## Architecture
 
 ```mermaid
