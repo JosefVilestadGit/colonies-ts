@@ -9,7 +9,6 @@ import { ColoniesClient } from './colonies-sdk.js';
 
 let config = {};
 let client = null; // ColoniesClient instance
-let definitions = [];
 let devices = [];
 let currentDevice = null;
 let currentDeviceData = null;
@@ -19,7 +18,6 @@ const pendingUpdates = new Map(); // Track pending spec updates for timing
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   await loadConfig();
-  await loadDefinitions();
   await loadDevices();
   setupEventListeners();
   connectWebSocket();
@@ -63,13 +61,13 @@ function connectWebSocket() {
       console.log('WebSocket message received:', message);
 
       if (message.type === 'init') {
-        // Initial state from reconciler
+        // Initial state from reconciler (each device has { spec, status })
         console.log('Received initial device states:', Object.keys(message.devices));
         updateDevicesFromReconciler(message.devices);
       } else if (message.type === 'update') {
-        // Single device update
-        console.log(`Device update: ${message.device}`, message.status);
-        updateSingleDeviceStatus(message.device, message.status);
+        // Single device update (includes both spec and status)
+        console.log(`Device update: ${message.device}`, message.spec, message.status);
+        updateSingleDevice(message.device, message.spec, message.status);
       }
     } catch (error) {
       console.error('Error processing WebSocket message:', error);
@@ -88,10 +86,29 @@ function connectWebSocket() {
   };
 }
 
-// Update device statuses from reconciler's in-memory state
+// Update device states from reconciler's in-memory state (init message)
 function updateDevicesFromReconciler(reconcilerStates) {
-  for (const [name, status] of Object.entries(reconcilerStates)) {
-    updateSingleDeviceStatus(name, status);
+  for (const [name, deviceData] of Object.entries(reconcilerStates)) {
+    // Each device has { spec, status }
+    updateSingleDevice(name, deviceData.spec, deviceData.status);
+  }
+}
+
+// Update a single device's spec and status
+function updateSingleDevice(deviceName, spec, status) {
+  const device = devices.find(d => d.metadata?.name === deviceName);
+  if (device) {
+    if (spec) device.spec = spec;
+    if (status) device.status = status;
+    renderDevices();
+
+    // Update modal if this device is open
+    if (currentDevice === deviceName) {
+      currentDeviceData = device;
+      renderDeviceVisualization(device);
+      renderDesiredStateControls(device);
+      renderActualState(device);
+    }
   }
 }
 
@@ -150,24 +167,6 @@ async function loadConfig() {
   }
 }
 
-async function loadDefinitions() {
-  try {
-    console.log('loadDefinitions: client=', client, 'colonyPrvKey=', config.colonyPrvKey?.substring(0, 8) + '...');
-    if (!client) {
-      throw new Error('Client not initialized');
-    }
-    client.setPrivateKey(config.colonyPrvKey);
-    console.log('loadDefinitions: calling getBlueprintDefinitions...');
-    definitions = await client.getBlueprintDefinitions(config.colonyName) || [];
-    console.log('loadDefinitions: got', definitions.length, 'definitions');
-    renderDefinitions();
-    updateDeviceKindOptions();
-  } catch (error) {
-    console.error('Failed to load definitions:', error);
-    showNotification('Failed to load device types', 'error');
-  }
-}
-
 async function loadDevices() {
   try {
     client.setPrivateKey(config.executorPrvKey || config.colonyPrvKey);
@@ -188,27 +187,6 @@ async function loadDevices() {
   }
 }
 
-function renderDefinitions() {
-  const container = document.getElementById('definitions-list');
-
-  if (!definitions || definitions.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <p>No device types defined</p>
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = definitions.map(def => `
-    <div class="definition-tag">
-      <span class="kind">${def.kind || def.spec?.names?.kind || 'Unknown'}</span>
-      <span>${def.metadata?.name || ''}</span>
-      <button class="delete-btn" onclick="deleteDefinition('${def.metadata?.name}')">&times;</button>
-    </div>
-  `).join('');
-}
-
 function renderDevices() {
   const container = document.getElementById('devices-grid');
 
@@ -216,7 +194,6 @@ function renderDevices() {
     container.innerHTML = `
       <div class="empty-state">
         <p>No devices configured</p>
-        <button class="btn btn-primary" onclick="openModal('add-device-modal')">Add Your First Device</button>
       </div>
     `;
     return;
@@ -239,7 +216,7 @@ function renderDevices() {
         <div class="device-room">${spec.room || 'No room'}</div>
 
         <div class="device-visual">
-          ${renderDeviceCard(deviceType, spec, status, hasStatus)}
+          ${renderDeviceCard(deviceType, spec, status, hasStatus, device.metadata?.name)}
         </div>
 
         <div class="device-states">
@@ -290,14 +267,14 @@ function formatStateValue(state) {
   return parts.join(', ') || 'N/A';
 }
 
-function renderDeviceCard(deviceType, spec, status, hasStatus) {
+function renderDeviceCard(deviceType, spec, status, hasStatus, deviceName) {
   if (deviceType === 'thermostat') {
-    return renderThermostatCard(spec, status, hasStatus);
+    return renderThermostatCard(spec, status, hasStatus, deviceName);
   }
-  return renderLightCard(spec, status, hasStatus);
+  return renderLightCard(spec, status, hasStatus, deviceName);
 }
 
-function renderLightCard(spec, status, hasStatus) {
+function renderLightCard(spec, status, hasStatus, deviceName = 'default') {
   const desiredOn = spec.power === true;
   const actualOn = hasStatus ? status.power === true : null;
   const desiredBrightness = spec.brightness ?? 100;
@@ -311,23 +288,27 @@ function renderLightCard(spec, status, hasStatus) {
   // Minimum intensity of 0.15 when on, so bulb is visible even at 0% brightness
   const intensity = displayOn ? Math.max(0.15, brightness / 100) : 0;
 
+  // Use unique IDs per device to avoid SVG gradient conflicts
+  const gradId = `bulb-grad-${deviceName}`;
+  const baseGradId = `base-grad-${deviceName}`;
+
   return `
     <div class="light-visual">
       <svg viewBox="0 0 100 120" class="light-bulb">
         <defs>
-          <radialGradient id="bulb-grad-card" cx="50%" cy="40%" r="50%">
+          <radialGradient id="${gradId}" cx="50%" cy="40%" r="50%">
             <stop offset="0%" stop-color="${displayOn ? `rgba(255,255,200,${0.9 * intensity})` : '#555'}"/>
             <stop offset="50%" stop-color="${displayOn ? `rgba(255,200,80,${0.8 * intensity})` : '#444'}"/>
             <stop offset="100%" stop-color="${displayOn ? `rgba(200,150,50,${0.6 * intensity})` : '#333'}"/>
           </radialGradient>
-          <linearGradient id="base-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <linearGradient id="${baseGradId}" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stop-color="#aaa"/>
             <stop offset="100%" stop-color="#555"/>
           </linearGradient>
         </defs>
 
         <!-- Glass bulb -->
-        <ellipse cx="50" cy="45" rx="32" ry="38" fill="url(#bulb-grad-card)" stroke="#888" stroke-width="1.5"/>
+        <ellipse cx="50" cy="45" rx="32" ry="38" fill="url(#${gradId})" stroke="#888" stroke-width="1.5"/>
 
         <!-- Highlight -->
         <ellipse cx="38" cy="32" rx="8" ry="12" fill="rgba(255,255,255,0.15)"/>
@@ -340,7 +321,7 @@ function renderLightCard(spec, status, hasStatus) {
         ` : ''}
 
         <!-- Screw base -->
-        <path d="M35 83 L38 78 L62 78 L65 83 Z" fill="url(#base-grad)"/>
+        <path d="M35 83 L38 78 L62 78 L65 83 Z" fill="url(#${baseGradId})"/>
         <rect x="36" y="83" width="28" height="6" fill="#777" rx="1"/>
         <rect x="38" y="89" width="24" height="5" fill="#666" rx="1"/>
         <rect x="40" y="94" width="20" height="5" fill="#555" rx="1"/>
@@ -354,7 +335,7 @@ function renderLightCard(spec, status, hasStatus) {
   `;
 }
 
-function renderThermostatCard(spec, status, hasStatus) {
+function renderThermostatCard(spec, status, hasStatus, deviceName = 'default') {
   const desiredTemp = spec.temperature || 20;
   const actualTemp = hasStatus ? (status.temperature || null) : null;
   const displayTemp = hasStatus && actualTemp !== null ? actualTemp : desiredTemp;
@@ -382,39 +363,7 @@ function renderThermostatCard(spec, status, hasStatus) {
   `;
 }
 
-function updateDeviceKindOptions() {
-  const select = document.getElementById('device-kind');
-  select.innerHTML = '<option value="">Select device type...</option>';
-
-  if (definitions && definitions.length > 0) {
-    definitions.forEach(def => {
-      const kind = def.kind || def.spec?.names?.kind;
-      if (kind) {
-        select.innerHTML += `<option value="${kind}">${kind}</option>`;
-      }
-    });
-  }
-}
-
 function setupEventListeners() {
-  document.getElementById('add-device-btn').addEventListener('click', () => {
-    openModal('add-device-modal');
-  });
-
-  document.getElementById('add-definition-btn').addEventListener('click', () => {
-    openModal('add-definition-modal');
-  });
-
-  document.getElementById('add-device-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await addDevice();
-  });
-
-  document.getElementById('add-definition-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await addDefinition();
-  });
-
   document.getElementById('reconcile-btn').addEventListener('click', async () => {
     if (currentDevice) {
       await reconcileDevice(currentDevice);
@@ -436,94 +385,6 @@ function setupEventListeners() {
       }
     });
   });
-}
-
-async function addDevice() {
-  const name = document.getElementById('device-name').value;
-  const kind = document.getElementById('device-kind').value;
-  const deviceType = document.getElementById('device-type').value;
-  const room = document.getElementById('device-room').value;
-
-  try {
-    const spec = { room, deviceType };
-
-    if (deviceType === 'light') {
-      spec.power = false;
-      spec.brightness = 100;
-    } else if (deviceType === 'thermostat') {
-      spec.power = true;
-      spec.temperature = 21;
-    }
-
-    client.setPrivateKey(config.executorPrvKey || config.colonyPrvKey);
-    await client.addBlueprint({
-      kind,
-      metadata: {
-        name,
-        colonyname: config.colonyName,
-      },
-      handler: {
-        executortype: 'home-reconciler',
-      },
-      spec,
-    });
-
-    closeModal('add-device-modal');
-    document.getElementById('add-device-form').reset();
-    await loadDevices();
-    showNotification(`Device "${name}" created`, 'success');
-  } catch (error) {
-    console.error('Failed to create device:', error);
-    showNotification('Failed to create device', 'error');
-  }
-}
-
-async function addDefinition() {
-  const name = document.getElementById('def-name').value;
-  const kind = document.getElementById('def-kind').value;
-
-  try {
-    client.setPrivateKey(config.colonyPrvKey);
-    await client.addBlueprintDefinition({
-      kind,
-      metadata: {
-        name,
-        colonyname: config.colonyName,
-      },
-      spec: {
-        names: {
-          kind,
-          singular: kind.toLowerCase(),
-          plural: kind.toLowerCase() + 's',
-        },
-        handler: {
-          executorType: 'home-reconciler',
-        },
-      },
-    });
-
-    closeModal('add-definition-modal');
-    document.getElementById('add-definition-form').reset();
-    await loadDefinitions();
-    showNotification(`Device type "${kind}" created`, 'success');
-  } catch (error) {
-    console.error('Failed to create definition:', error);
-    showNotification('Failed to create device type', 'error');
-  }
-}
-
-async function deleteDefinition(name) {
-  if (!confirm(`Delete device type "${name}"?`)) return;
-
-  try {
-    client.setPrivateKey(config.colonyPrvKey);
-    await client.removeBlueprintDefinition(config.colonyName, name);
-    await loadDefinitions();
-    showNotification('Device type deleted', 'success');
-  } catch (error) {
-    console.error('Failed to delete definition:', error);
-    showNotification('Failed to delete device type', 'error');
-  }
 }
 
 async function deleteDevice(name) {
@@ -861,4 +722,3 @@ window.closeModal = closeModal;
 window.openModal = openModal;
 window.openDeviceControl = openDeviceControl;
 window.updateSpec = updateSpec;
-window.deleteDefinition = deleteDefinition;

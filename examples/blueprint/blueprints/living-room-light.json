@@ -5,7 +5,8 @@
     "colonyname": "dev"
   },
   "handler": {
-    "executortype": "home-reconciler"
+    "executortype": "home-reconciler",
+    "functionname": "reconcile"
   },
   "spec": {
     "deviceType": "light",

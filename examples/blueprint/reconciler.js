@@ -94,10 +94,11 @@ httpServer.listen(config.wsPort, '0.0.0.0', () => {
   console.log(`WebSocket server listening on 0.0.0.0:${config.wsPort}`);
 });
 
-function broadcastDeviceUpdate(deviceName, status) {
+function broadcastDeviceUpdate(deviceName, spec, status) {
   const message = JSON.stringify({
     type: 'update',
     device: deviceName,
+    spec: spec,
     status: status,
   });
   console.log(`Broadcasting update to ${clients.size} client(s): ${deviceName}`, status);
@@ -150,8 +151,11 @@ async function loadExistingDeviceStates() {
     if (blueprints && blueprints.length > 0) {
       for (const bp of blueprints) {
         const name = bp.metadata?.name;
-        if (name && bp.status && Object.keys(bp.status).length > 0) {
-          deviceStates.set(name, bp.status);
+        if (name) {
+          deviceStates.set(name, {
+            spec: bp.spec || {},
+            status: bp.status || {}
+          });
           console.log(`  Loaded state for: ${name}`);
         }
       }
@@ -173,24 +177,45 @@ async function simulateDevice(deviceName, spec) {
     online: true,
   };
 
-  deviceStates.set(deviceName, newStatus);
+  deviceStates.set(deviceName, { spec, status: newStatus });
 
-  // Broadcast update to connected UI clients
-  broadcastDeviceUpdate(deviceName, newStatus);
+  // Broadcast update to connected UI clients (include spec so UI can update both)
+  broadcastDeviceUpdate(deviceName, spec, newStatus);
 
   return newStatus;
 }
 
+// Check if spec and status are in sync (ignoring metadata fields)
+function needsReconciliation(spec, status) {
+  if (!status || Object.keys(status).length === 0) return true;
+
+  // Compare relevant fields from spec to status
+  for (const key of Object.keys(spec)) {
+    if (spec[key] !== status[key]) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function reconcileSingleBlueprint(blueprintName) {
   const t0 = Date.now();
-  console.log(`  [${t0}] Reconciling device: ${blueprintName}`);
 
   // Get the blueprint
   const blueprint = await client.getBlueprint(config.colonyName, blueprintName);
   const t1 = Date.now();
   const spec = blueprint.spec || {};
+  const status = blueprint.status || {};
 
-  console.log(`  [${t1}] Got blueprint (+${t1-t0}ms), spec:`, JSON.stringify(spec));
+  // Check if reconciliation is needed
+  if (!needsReconciliation(spec, status)) {
+    console.log(`  [${t1}] Skipping ${blueprintName} - already in sync`);
+    return;
+  }
+
+  console.log(`  [${t1}] Reconciling device: ${blueprintName} (+${t1-t0}ms)`);
+  console.log(`    spec:`, JSON.stringify(spec));
+  console.log(`    status:`, JSON.stringify(status));
 
   // Simulate applying to device
   const newStatus = await simulateDevice(blueprintName, spec);

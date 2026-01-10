@@ -11,7 +11,8 @@
       "plural": "homedevices"
     },
     "handler": {
-      "executorType": "home-reconciler"
+      "executorType": "home-reconciler",
+      "functionName": "reconcile"
     }
   }
 }
