@@ -14,9 +14,10 @@ flowchart LR
         App --> SDK
     end
 
-    subgraph Static[Static Server :3000]
+    subgraph Frontend[Frontend Server :3000]
         Express[Node.js Express]
         Files[HTML/JS/CSS]
+        WSProxy[WebSocket Proxy]
         Express --> Files
     end
 
@@ -30,16 +31,17 @@ flowchart LR
 
     subgraph Reconciler[Reconciler :46701]
         Executor[home-reconciler]
-        WS[WebSocket]
+        WS[WebSocket Server]
         Devices[Simulated Devices]
         Executor --> Devices
     end
 
-    Browser -->|fetch static files| Static
+    Browser -->|fetch static files| Express
     SDK <-->|HTTP API| Server
-    Browser <-.->|WebSocket| WS
+    Browser <-.->|WebSocket :3000/ws| WSProxy
+    WSProxy <-.->|WebSocket :46701| WS
     Executor <-->|assign/close| Server
-    WS -.->|status updates| Browser
+    WS -.->|status updates| WSProxy
 ```
 
 ### Direct SDK Access
@@ -47,13 +49,35 @@ flowchart LR
 The browser uses the **colonies-ts SDK directly** to communicate with ColonyOS:
 
 - **No API proxy** - Browser talks directly to ColonyOS server via SDK
-- **Static file server** - Express only serves HTML, JS, and CSS
-- **Real-time updates** - Browser connects to reconciler WebSocket on port 46701
+- **Static file server** - Express serves HTML, JS, CSS, and configuration
+- **Real-time updates** - Browser connects via WebSocket proxy on same port
 
 This is possible because:
 1. ColonyOS server has CORS enabled (`Access-Control-Allow-Origin: *`)
 2. The SDK is bundled for browser use with esbuild
 3. Private keys are passed from server config (demo only - use proper auth in production)
+
+### WebSocket Proxy
+
+Real-time updates use a WebSocket proxy through the frontend server:
+
+```
+Browser → ws://host:3000/ws → ws://localhost:46701 (reconciler)
+```
+
+The proxy routes WebSocket connections from the browser (port 3000) to the reconciler (port 46701). This design:
+- Avoids cross-port WebSocket issues in Safari
+- Simplifies firewall configuration (single port)
+- Works when accessing from other machines on the network
+
+### Browser Compatibility
+
+**Chrome/Firefox**: Work reliably with this setup.
+
+**Safari**: Has stricter security policies for WebSocket connections over HTTP to private IP addresses. The app includes an auto-reload workaround that detects failed connections and reloads the page. For production use:
+- Use HTTPS with valid certificates
+- Use a proper hostname instead of IP address
+- Consider running behind a reverse proxy (nginx, Caddy)
 
 ## Reconciliation Flow
 
@@ -537,3 +561,48 @@ export COLONIES_SERVER_HOST=your-server.com
 export COLONIES_SERVER_PORT=443
 export COLONIES_TLS=true
 ```
+
+### Safari WebSocket Issues
+
+Safari has strict security policies for WebSocket connections over HTTP to private IP addresses. Symptoms:
+- WebSocket connects in Chrome but fails in Safari
+- Connection works intermittently (every other page load)
+- Browser console shows WebSocket connection errors
+
+The app includes an auto-reload workaround that detects failed connections. For a permanent fix:
+
+1. **Use HTTPS**: Set up TLS certificates (even self-signed for development)
+2. **Use a hostname**: Add the server to `/etc/hosts` or use local DNS
+3. **Use a reverse proxy**: nginx or Caddy can handle TLS termination
+
+Example nginx configuration:
+```nginx
+server {
+    listen 443 ssl;
+    server_name homeauto.local;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://localhost:3000;
+    }
+
+    location /ws {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+### Accessing from Other Machines
+
+To access the web UI from other devices on your network:
+
+1. Start the server (it listens on `0.0.0.0` by default)
+2. Find the server's IP address: `ip addr` or `hostname -I`
+3. Open `http://<server-ip>:3000` in the browser
+
+The app dynamically uses the browser's host for WebSocket connections, so it works automatically when accessed via IP or hostname.

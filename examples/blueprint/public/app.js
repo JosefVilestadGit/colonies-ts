@@ -13,45 +13,73 @@ let devices = [];
 let currentDevice = null;
 let currentDeviceData = null;
 let ws = null;
+let wsConnecting = false; // Prevent multiple simultaneous connection attempts
 const pendingUpdates = new Map(); // Track pending spec updates for timing
 
 // Initialize
-document.addEventListener('DOMContentLoaded', async () => {
+window.addEventListener('load', async () => {
   await loadConfig();
   await loadDevices();
   setupEventListeners();
   connectWebSocket();
 });
 
-// Clean close on page unload to prevent alternating connection issues
-window.addEventListener('beforeunload', () => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.close(1000, 'page unload');
+// Handle Safari's Back-Forward Cache - reconnect WebSocket when page is restored
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    console.log('Page restored from bfcache, reconnecting WebSocket');
+    if (ws) {
+      ws.close();
+      ws = null;
+    }
+    wsConnecting = false;
+    connectWebSocket();
   }
 });
 
+// Note: Removed beforeunload close - it was causing Safari to fail on alternate reloads
+
 // WebSocket connection directly to reconciler
 function connectWebSocket() {
+  if (wsConnecting || (ws && ws.readyState === WebSocket.OPEN)) {
+    return;
+  }
+
   const wsUrl = config.reconcilerWsUrl;
   if (!wsUrl) {
     console.error('No reconcilerWsUrl in config');
     return;
   }
 
-  console.log('Connecting to reconciler at:', wsUrl);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+  console.log('Connecting to WebSocket:', wsUrl);
+  wsConnecting = true;
 
   try {
     ws = new WebSocket(wsUrl);
-    console.log('WebSocket created, readyState:', ws.readyState);
   } catch (error) {
     console.error('Failed to create WebSocket:', error);
+    wsConnecting = false;
     return;
   }
 
+  // Safari workaround: if connection fails, auto-reload the page
+  const timeoutId = setTimeout(() => {
+    if (ws.readyState !== WebSocket.OPEN) {
+      console.log('WebSocket connection timeout');
+      if (isSafari) {
+        console.log('Safari detected, reloading page...');
+        location.reload();
+      }
+    }
+  }, 1500);
+
   ws.onopen = () => {
-    console.log('WebSocket OPEN, readyState:', ws.readyState);
-    document.getElementById('connection-status').textContent =
-      `Connected to ${config.colonyName} @ ${config.serverHost}:${config.serverPort} (live)`;
+    clearTimeout(timeoutId);
+    console.log('WebSocket connected');
+    wsConnecting = false;
+    document.getElementById('connection-status').textContent = 'Connected';
     document.getElementById('connection-status').classList.add('connected');
   };
 
@@ -75,21 +103,25 @@ function connectWebSocket() {
   };
 
   ws.onclose = (event) => {
-    console.log('WebSocket CLOSED, code:', event.code, 'reason:', event.reason, 'wasClean:', event.wasClean);
-    document.getElementById('connection-status').textContent = 'Reconnecting...';
+    clearTimeout(timeoutId);
+    console.log('WebSocket closed:', event.code);
+    wsConnecting = false;
+    document.getElementById('connection-status').textContent = 'Disconnected';
     document.getElementById('connection-status').classList.remove('connected');
+    // Reconnect after delay
     setTimeout(connectWebSocket, 2000);
   };
 
   ws.onerror = (event) => {
-    console.error('WebSocket error:', event);
+    clearTimeout(timeoutId);
+    console.error('WebSocket error');
+    wsConnecting = false;
   };
 }
 
 // Update device states from reconciler's in-memory state (init message)
 function updateDevicesFromReconciler(reconcilerStates) {
   for (const [name, deviceData] of Object.entries(reconcilerStates)) {
-    // Each device has { spec, status }
     updateSingleDevice(name, deviceData.spec, deviceData.status);
   }
 }
