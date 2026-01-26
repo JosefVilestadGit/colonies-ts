@@ -1,0 +1,20 @@
+{
+  "kind": "DataLogger",
+  "metadata": {
+    "name": "data-logger-1",
+    "colonyname": "dev"
+  },
+  "handler": {
+    "executortype": "data-logger-reconciler",
+    "functionname": "reconcile"
+  },
+  "spec": {
+    "name": "data-logger-1",
+    "location": "Server Room A",
+    "appName": "DataCollector",
+    "appVersion": "2.9",
+    "enabled": true,
+    "logInterval": 5,
+    "logFormat": "json"
+  }
+}

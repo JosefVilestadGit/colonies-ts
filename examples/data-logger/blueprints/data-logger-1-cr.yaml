@@ -1,0 +1,20 @@
+apiVersion: colonies.io/v1
+kind: DataLogger
+metadata:
+  name: data-logger-1
+  namespace: dev
+spec:
+  name: data-logger-1
+  location: Server Room A
+  stack:
+    application:
+      name: DataCollector
+      version: "2.7"
+      enabled: true
+  logging:
+    enabled: true
+    interval: 5
+    format: json
+  handler:
+    executorType: data-logger-reconciler
+    functionName: reconcile

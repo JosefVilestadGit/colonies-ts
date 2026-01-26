@@ -1,0 +1,31 @@
+{
+  "kind": "DataLogger",
+  "metadata": {
+    "name": "data-logger-def",
+    "colonyname": "dev"
+  },
+  "spec": {
+    "names": {
+      "kind": "DataLogger",
+      "singular": "datalogger",
+      "plural": "dataloggers"
+    },
+    "handler": {
+      "executorType": "data-logger-reconciler",
+      "functionName": "reconcile"
+    },
+    "schema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "appName": { "type": "string" },
+        "appVersion": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "logInterval": { "type": "number" },
+        "logFormat": { "type": "string" }
+      },
+      "required": ["name", "appName", "appVersion"]
+    }
+  }
+}

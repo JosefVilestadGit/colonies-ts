@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Logger - Software Stack Demo</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <div class="header-content">
+        <h1>Data Logger</h1>
+        <div class="connection-status">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">Connecting...</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Left Column: Device -->
+      <div class="data-logger-panel">
+        <!-- Data Logger Device Visualization -->
+        <div class="device-section">
+          <h2>Device</h2>
+          <div class="device-container" id="device-container">
+            <!-- SVG data logger device will be rendered here -->
+          </div>
+          <div class="device-info" id="device-info">
+            <div class="info-row">
+              <span class="info-label">Name:</span>
+              <span class="info-value" id="device-name">--</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Location:</span>
+              <span class="info-value" id="device-location">--</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Status:</span>
+              <span class="info-value status-badge" id="device-status">Offline</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Controls + State -->
+      <div class="state-panel">
+        <!-- Activity Log -->
+        <div class="activity-section">
+          <h2>Activity Log</h2>
+          <div class="activity-log" id="activity-log">
+            <!-- Activity entries will be rendered here -->
+          </div>
+        </div>
+
+        <!-- State Comparison Panel -->
+        <div class="state-comparison">
+          <div class="state-column desired-state">
+            <h3>Desired State</h3>
+            <div class="state-content" id="desired-state-content">
+              <!-- Desired state will be rendered here -->
+            </div>
+          </div>
+          <div class="state-arrow">
+            <span id="sync-arrow">=</span>
+          </div>
+          <div class="state-column actual-state">
+            <h3>Actual State</h3>
+            <div class="state-content" id="actual-state-content">
+              <!-- Actual state will be rendered here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Notifications -->
+    <div class="notifications" id="notifications"></div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
