@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patient</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Patient</h1>
+    <p id="connection-status">Connecting...</p>
+  </header>
+
+  <main>
+    <div class="devices-row">
+
+      <!-- Blood Pressure Monitor -->
+      <div class="device-panel bp-panel">
+        <div class="monitor-frame">
+          <div class="monitor-screen">
+            <div class="monitor-brand">ColonyOS Medical</div>
+
+            <div class="bp-display">
+              <div class="bp-reading-group">
+                <div class="bp-label">SYS</div>
+                <div class="bp-value" id="bp-sys-display">120</div>
+                <div class="bp-unit">mmHg</div>
+              </div>
+              <div class="bp-divider"></div>
+              <div class="bp-reading-group">
+                <div class="bp-label">DIA</div>
+                <div class="bp-value" id="bp-dia-display">80</div>
+                <div class="bp-unit">mmHg</div>
+              </div>
+            </div>
+
+            <div class="pulse-display">
+              <div class="pulse-icon" id="pulse-icon"></div>
+              <div class="pulse-reading">
+                <span class="pulse-value" id="bp-pulse-display">72</span>
+                <span class="pulse-label">BPM</span>
+              </div>
+            </div>
+
+            <div class="bp-status" id="bp-status">Normal</div>
+          </div>
+
+          <div class="monitor-controls">
+            <div class="control-group">
+              <label>Systolic</label>
+              <div class="input-row">
+                <input type="range" class="slider" id="bp-sys-slider" min="60" max="220" value="120">
+                <span class="slider-val" id="bp-sys-val">120</span>
+              </div>
+            </div>
+            <div class="control-group">
+              <label>Diastolic</label>
+              <div class="input-row">
+                <input type="range" class="slider" id="bp-dia-slider" min="30" max="140" value="80">
+                <span class="slider-val" id="bp-dia-val">80</span>
+              </div>
+            </div>
+            <div class="control-group">
+              <label>Pulse</label>
+              <div class="input-row">
+                <input type="range" class="slider" id="bp-pulse-slider" min="30" max="200" value="72">
+                <span class="slider-val" id="bp-pulse-val">72</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Thermometer -->
+      <div class="device-panel thermo-panel">
+        <div class="monitor-frame">
+          <div class="monitor-screen">
+            <div class="monitor-brand">ColonyOS Medical</div>
+
+            <div class="thermo-display">
+              <div class="thermometer-svg-wrap">
+                <svg viewBox="0 0 80 260" class="thermometer-svg">
+                  <defs>
+                    <linearGradient id="mercury-grad" x1="0" y1="1" x2="0" y2="0">
+                      <stop offset="0%" stop-color="#ef4444"/>
+                      <stop offset="100%" stop-color="#f87171"/>
+                    </linearGradient>
+                    <clipPath id="tube-clip">
+                      <rect x="30" y="20" width="20" height="180" rx="10"/>
+                    </clipPath>
+                  </defs>
+
+                  <!-- Tube background -->
+                  <rect x="30" y="20" width="20" height="180" rx="10" fill="#1a1a2e" stroke="#374151" stroke-width="2"/>
+
+                  <!-- Tick marks -->
+                  <line x1="52" y1="30" x2="58" y2="30" stroke="#555" stroke-width="1"/>
+                  <text x="61" y="34" fill="#888" font-size="10">42</text>
+                  <line x1="52" y1="60" x2="58" y2="60" stroke="#555" stroke-width="1"/>
+                  <text x="61" y="64" fill="#888" font-size="10">40</text>
+                  <line x1="52" y1="90" x2="58" y2="90" stroke="#555" stroke-width="1"/>
+                  <text x="61" y="94" fill="#888" font-size="10">38</text>
+                  <line x1="52" y1="120" x2="58" y2="120" stroke="#555" stroke-width="1"/>
+                  <text x="61" y="124" fill="#888" font-size="10">36</text>
+                  <line x1="52" y1="150" x2="58" y2="150" stroke="#555" stroke-width="1"/>
+                  <text x="61" y="154" fill="#888" font-size="10">34</text>
+                  <line x1="52" y1="180" x2="58" y2="180" stroke="#555" stroke-width="1"/>
+                  <text x="61" y="184" fill="#888" font-size="10">32</text>
+
+                  <!-- Mercury column -->
+                  <rect id="mercury-col" x="30" y="100" width="20" height="100" fill="url(#mercury-grad)" clip-path="url(#tube-clip)"/>
+
+                  <!-- Bulb -->
+                  <circle cx="40" cy="220" r="24" fill="#1a1a2e" stroke="#374151" stroke-width="2"/>
+                  <circle cx="40" cy="220" r="18" fill="#ef4444"/>
+                </svg>
+              </div>
+
+              <div class="temp-readout">
+                <div class="temp-big" id="thermo-temp-display">36.6</div>
+                <div class="temp-unit-big">&deg;C</div>
+              </div>
+            </div>
+
+            <div class="thermo-status" id="thermo-status">Normal</div>
+          </div>
+
+          <div class="monitor-controls">
+            <div class="control-group">
+              <label>Temperature (&deg;C)</label>
+              <div class="input-row">
+                <input type="range" class="slider thermo-slider" id="thermo-slider" min="320" max="424" value="366" step="1">
+                <span class="slider-val" id="thermo-val">36.6</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Symptoms -->
+    <div class="symptoms-panel">
+      <div class="monitor-frame">
+        <div class="symptoms-header">Symptoms</div>
+        <div class="symptoms-body">
+          <textarea id="symptoms-input" class="symptoms-textarea" placeholder="Describe symptoms here..." rows="4"></textarea>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

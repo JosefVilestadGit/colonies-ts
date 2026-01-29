@@ -269,6 +269,40 @@ describe('ColoniesClient Integration Tests', () => {
     });
   });
 
+  describe('Function Registration', () => {
+    it('should register a function and retrieve it', async () => {
+      client.setPrivateKey(TEST_CONFIG.executorPrvKey);
+
+      const func = {
+        executorname: TEST_CONFIG.executorName,
+        executortype: TEST_CONFIG.executorType,
+        colonyname: TEST_CONFIG.colonyName,
+        funcname: 'tool_test_function',
+        description: 'A test tool function',
+        args: [
+          { name: 'input', type: 'string', description: 'Test input', required: true },
+          { name: 'count', type: 'integer', description: 'Number of items', required: false },
+        ],
+      };
+
+      const result = await client.addFunction(func);
+      expect(result).toBeDefined();
+      expect(result.funcname).toBe('tool_test_function');
+      expect(result.description).toBe('A test tool function');
+
+      // Verify via getFunctions
+      const functions = await client.getFunctions(TEST_CONFIG.executorName, TEST_CONFIG.colonyName);
+      expect(functions).toBeDefined();
+      const found = functions.find((f: any) => f.funcname === 'tool_test_function');
+      expect(found).toBeDefined();
+      expect(found.description).toBe('A test tool function');
+      expect(found.args).toHaveLength(2);
+      expect(found.args[0].name).toBe('input');
+      expect(found.args[0].required).toBe(true);
+      expect(found.args[1].name).toBe('count');
+    });
+  });
+
   describe('Process Operations (Executor Key)', () => {
     it('should submit a function spec and get the process', async () => {
       client.setPrivateKey(TEST_CONFIG.executorPrvKey);

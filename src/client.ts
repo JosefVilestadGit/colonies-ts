@@ -424,6 +424,27 @@ export class ColoniesClient {
 
   // ==================== Function Methods ====================
 
+  async addFunction(func: {
+    executorname: string;
+    executortype: string;
+    colonyname: string;
+    funcname: string;
+    description?: string;
+    args?: Array<{
+      name: string;
+      type: string;
+      description?: string;
+      required?: boolean;
+      enum?: string[];
+    }>;
+  }): Promise<any> {
+    const msg = {
+      msgtype: 'addfunctionmsg',
+      fun: func,
+    };
+    return this.sendRPC(this.createRPCMsg(msg));
+  }
+
   async getFunctions(executorName: string, colonyName: string): Promise<any> {
     const msg = {
       msgtype: 'getfunctionsmsg',
@@ -576,6 +597,52 @@ export class ColoniesClient {
       }
     }
 
+    return this.sendRPC(this.createRPCMsg(msg));
+  }
+
+  /**
+   * Register a file in ColonyFS
+   * @param file - File metadata including colony, label, name, size, checksum, and S3 reference
+   */
+  async addFile(file: {
+    colonyname: string;
+    label: string;
+    name: string;
+    size: number;
+    checksum: string;
+    checksumalg: string;
+    ref: {
+      protocol: string;
+      s3object: {
+        server: string;
+        port: number;
+        tls: boolean;
+        accesskey: string;
+        secretkey: string;
+        region: string;
+        bucket: string;
+        object: string;
+      };
+    };
+  }): Promise<any> {
+    const msg = {
+      msgtype: 'addfilemsg',
+      file,
+    };
+    return this.sendRPC(this.createRPCMsg(msg));
+  }
+
+  /**
+   * Remove a file from ColonyFS
+   * @param colonyName - Name of the colony
+   * @param fileId - ID of the file to remove
+   */
+  async removeFile(colonyName: string, fileId: string): Promise<any> {
+    const msg = {
+      msgtype: 'removefilemsg',
+      colonyname: colonyName,
+      fileid: fileId,
+    };
     return this.sendRPC(this.createRPCMsg(msg));
   }
 

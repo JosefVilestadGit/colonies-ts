@@ -247,6 +247,33 @@ describe('ColoniesClient', () => {
       expect(fetchSpy.mock.calls[0][0]).toBe('https://localhost:443/api');
     });
 
+    it('should call addFunction with correct message', async () => {
+      const func = {
+        executorname: 'test-executor',
+        executortype: 'toolsexecutor',
+        colonyname: 'test',
+        funcname: 'tool_read_temperature',
+        description: 'Read the current body temperature',
+        args: [
+          { name: 'unit', type: 'string', description: 'Temperature unit', required: false },
+        ],
+      };
+      fetchSpy.mockResolvedValueOnce(createMockResponse(func));
+
+      await client.addFunction(func);
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+      expect(body.payloadtype).toBe('addfunctionmsg');
+      const payload = decodePayload(body.payload);
+      expect(payload.msgtype).toBe('addfunctionmsg');
+      expect(payload.fun).toEqual(func);
+      expect(payload.fun.funcname).toBe('tool_read_temperature');
+      expect(payload.fun.description).toBe('Read the current body temperature');
+      expect(payload.fun.args).toHaveLength(1);
+      expect(payload.fun.args[0].name).toBe('unit');
+    });
+
     it('should throw error when private key not set', async () => {
       const noKeyClient = new ColoniesClient({
         host: 'localhost',
