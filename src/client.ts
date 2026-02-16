@@ -430,6 +430,7 @@ export class ColoniesClient {
     colonyname: string;
     funcname: string;
     description?: string;
+    locationname?: string;
     args?: Array<{
       name: string;
       type: string;
@@ -737,17 +738,17 @@ export class ColoniesClient {
         payload:
           typeof entry.payload === 'string'
             ? (() => {
-                try {
-                  const binaryStr = atob(entry.payload);
-                  const bytes = new Uint8Array(binaryStr.length);
-                  for (let i = 0; i < binaryStr.length; i++) {
-                    bytes[i] = binaryStr.charCodeAt(i);
-                  }
-                  return new TextDecoder('utf-8').decode(bytes);
-                } catch {
-                  return entry.payload;
+              try {
+                const binaryStr = atob(entry.payload);
+                const bytes = new Uint8Array(binaryStr.length);
+                for (let i = 0; i < binaryStr.length; i++) {
+                  bytes[i] = binaryStr.charCodeAt(i);
                 }
-              })()
+                return new TextDecoder('utf-8').decode(bytes);
+              } catch {
+                return entry.payload;
+              }
+            })()
             : Array.isArray(entry.payload)
               ? new TextDecoder('utf-8').decode(new Uint8Array(entry.payload))
               : entry.payload,
@@ -817,17 +818,17 @@ export class ColoniesClient {
             payload:
               typeof entry.payload === 'string'
                 ? (() => {
-                    try {
-                      const binaryStr = atob(entry.payload);
-                      const bytes = new Uint8Array(binaryStr.length);
-                      for (let i = 0; i < binaryStr.length; i++) {
-                        bytes[i] = binaryStr.charCodeAt(i);
-                      }
-                      return new TextDecoder('utf-8').decode(bytes);
-                    } catch {
-                      return entry.payload;
+                  try {
+                    const binaryStr = atob(entry.payload);
+                    const bytes = new Uint8Array(binaryStr.length);
+                    for (let i = 0; i < binaryStr.length; i++) {
+                      bytes[i] = binaryStr.charCodeAt(i);
                     }
-                  })()
+                    return new TextDecoder('utf-8').decode(bytes);
+                  } catch {
+                    return entry.payload;
+                  }
+                })()
                 : Array.isArray(entry.payload)
                   ? new TextDecoder('utf-8').decode(new Uint8Array(entry.payload))
                   : entry.payload,
