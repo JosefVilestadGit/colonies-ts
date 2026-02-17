@@ -70,6 +70,165 @@ export enum ProcessState {
   FAILED = 3,
 }
 
+export interface Colony {
+  colonyid: string;
+  name: string;
+}
+
+export interface User {
+  colonyname: string;
+  userid: string;
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export interface Executor {
+  executorid: string;
+  executortype: string;
+  executorname: string;
+  colonyname: string;
+  approved?: boolean;
+}
+
+export interface Process {
+  processid: string;
+  processgraphid?: string;
+  state: ProcessState;
+  spec: FunctionSpec;
+  assignedexecutorname?: string;
+  assignedexecutortype?: string;
+  waitingtime?: number;
+  exectime?: number;
+  out?: string[];
+  errors?: string[];
+  submissiontime?: string;
+  starttime?: string;
+  endtime?: string;
+}
+
+export interface WorkflowSpec {
+  colonyname: string;
+  functionspecs: FunctionSpec[];
+}
+
+export interface ProcessGraph {
+  processgraphid: string;
+  state: ProcessState;
+  colonyname?: string;
+  roots?: string[];
+}
+
+export interface FunctionArg {
+  name: string;
+  type: string;
+  description?: string;
+  required?: boolean;
+  enum?: string[];
+}
+
+export interface ColonyFunction {
+  funcname: string;
+  executorname: string;
+  executortype: string;
+  colonyname: string;
+  description?: string;
+  locationname?: string;
+  args?: FunctionArg[];
+}
+
+export interface ColonyFile {
+  fileid?: string;
+  colonyname: string;
+  label: string;
+  name: string;
+  size: number;
+  checksum: string;
+  checksumalg: string;
+  ref: {
+    protocol: string;
+    s3object: {
+      server: string;
+      port: number;
+      tls: boolean;
+      accesskey: string;
+      secretkey: string;
+      region: string;
+      bucket: string;
+      object: string;
+    };
+  };
+}
+
+export interface Attribute {
+  attributeid?: string;
+  targetid: string;
+  targetcolonyname: string;
+  targetprocessgraphid: string;
+  attributetype: number;
+  key: string;
+  value: string;
+}
+
+export interface Cron {
+  cronid?: string;
+  colonyname: string;
+  name: string;
+  cron: string;
+  workflowspec?: WorkflowSpec;
+  nextrun?: string;
+  lastrun?: string;
+  checkin?: string;
+}
+
+export interface Generator {
+  generatorid?: string;
+  colonyname: string;
+  name: string;
+  workflowspec?: WorkflowSpec;
+  trigger?: number;
+  timeout?: number;
+  lastrun?: string;
+}
+
+export interface BlueprintMetadata {
+  name: string;
+  colonyname: string;
+  [key: string]: unknown;
+}
+
+export interface BlueprintHandler {
+  executortype: string;
+}
+
+export interface BlueprintDefinition {
+  kind: string;
+  metadata: BlueprintMetadata;
+  spec?: Record<string, unknown>;
+}
+
+export interface Blueprint {
+  blueprintid?: string;
+  kind: string;
+  metadata: BlueprintMetadata;
+  handler?: BlueprintHandler;
+  spec: Record<string, unknown>;
+  status?: Record<string, unknown>;
+}
+
+export interface ChannelEntry {
+  sequence: number;
+  inreplyto: number;
+  payload: string;
+}
+
+export interface Log {
+  processid?: string;
+  executorname?: string;
+  message: string;
+  timestamp?: string;
+}
+
 export class ColoniesClient {
   private host: string;
   private port: number;
@@ -160,7 +319,7 @@ export class ColoniesClient {
 
   // ==================== Colony Methods ====================
 
-  async getColonies(): Promise<any> {
+  async getColonies(): Promise<Colony[]> {
     const msg = { msgtype: 'getcoloniesmsg' };
     return this.sendRPC(this.createRPCMsg(msg));
   }
@@ -174,7 +333,7 @@ export class ColoniesClient {
    * Add a new colony (requires server private key)
    * @param colony - Colony object with colonyid and name
    */
-  async addColony(colony: { colonyid: string; name: string }): Promise<any> {
+  async addColony(colony: Colony): Promise<Colony> {
     const msg = {
       msgtype: 'addcolonymsg',
       colony,
@@ -186,7 +345,7 @@ export class ColoniesClient {
    * Remove a colony (requires server private key)
    * @param colonyName - Name of the colony to remove
    */
-  async removeColony(colonyName: string): Promise<any> {
+  async removeColony(colonyName: string): Promise<void> {
     const msg = {
       msgtype: 'removecolonymsg',
       colonyname: colonyName,
@@ -196,7 +355,7 @@ export class ColoniesClient {
 
   // ==================== Executor Methods ====================
 
-  async getExecutors(colonyName: string): Promise<any> {
+  async getExecutors(colonyName: string): Promise<Executor[]> {
     const msg = {
       msgtype: 'getexecutorsmsg',
       colonyname: colonyName,
@@ -204,7 +363,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async getExecutor(colonyName: string, executorName: string): Promise<any> {
+  async getExecutor(colonyName: string, executorName: string): Promise<Executor> {
     const msg = {
       msgtype: 'getexecutormsg',
       colonyname: colonyName,
@@ -213,12 +372,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async addExecutor(executor: {
-    executorid: string;
-    executortype: string;
-    executorname: string;
-    colonyname: string;
-  }): Promise<any> {
+  async addExecutor(executor: Executor): Promise<Executor> {
     const msg = {
       msgtype: 'addexecutormsg',
       executor,
@@ -226,7 +380,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async approveExecutor(colonyName: string, executorName: string): Promise<any> {
+  async approveExecutor(colonyName: string, executorName: string): Promise<Executor> {
     const msg = {
       msgtype: 'approveexecutormsg',
       colonyname: colonyName,
@@ -235,7 +389,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async removeExecutor(colonyName: string, executorName: string): Promise<any> {
+  async removeExecutor(colonyName: string, executorName: string): Promise<void> {
     const msg = {
       msgtype: 'removeexecutormsg',
       colonyname: colonyName,
@@ -246,7 +400,7 @@ export class ColoniesClient {
 
   // ==================== Process Methods ====================
 
-  async submitFunctionSpec(spec: FunctionSpec): Promise<any> {
+  async submitFunctionSpec(spec: FunctionSpec): Promise<Process> {
     const msg = {
       msgtype: 'submitfuncspecmsg',
       spec,
@@ -254,7 +408,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async getProcess(processId: string): Promise<any> {
+  async getProcess(processId: string): Promise<Process> {
     const msg = {
       msgtype: 'getprocessmsg',
       processid: processId,
@@ -262,7 +416,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async getProcesses(colonyName: string, count: number, state: ProcessState): Promise<any> {
+  async getProcesses(colonyName: string, count: number, state: ProcessState): Promise<Process[]> {
     const msg = {
       msgtype: 'getprocessesmsg',
       colonyname: colonyName,
@@ -272,7 +426,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async removeProcess(processId: string): Promise<any> {
+  async removeProcess(processId: string): Promise<void> {
     const msg = {
       msgtype: 'removeprocessmsg',
       processid: processId,
@@ -281,7 +435,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async removeAllProcesses(colonyName: string, state: number = -1): Promise<any> {
+  async removeAllProcesses(colonyName: string, state: number = -1): Promise<void> {
     const msg = {
       msgtype: 'removeallprocessesmsg',
       colonyname: colonyName,
@@ -290,7 +444,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async assign(colonyName: string, timeout: number, executorPrvKey: string): Promise<any> {
+  async assign(colonyName: string, timeout: number, executorPrvKey: string): Promise<Process> {
     // Temporarily set the executor private key for this operation
     const originalKey = this.privateKey;
     this.setPrivateKey(executorPrvKey);
@@ -309,7 +463,7 @@ export class ColoniesClient {
     }
   }
 
-  async closeProcess(processId: string, output: string[]): Promise<any> {
+  async closeProcess(processId: string, output: string[]): Promise<void> {
     const msg = {
       msgtype: 'closesuccessfulmsg',
       processid: processId,
@@ -318,7 +472,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async failProcess(processId: string, errors: string[]): Promise<any> {
+  async failProcess(processId: string, errors: string[]): Promise<void> {
     const msg = {
       msgtype: 'closefailedmsg',
       processid: processId,
@@ -329,10 +483,7 @@ export class ColoniesClient {
 
   // ==================== Workflow Methods ====================
 
-  async submitWorkflowSpec(workflowSpec: {
-    colonyname: string;
-    functionspecs: FunctionSpec[];
-  }): Promise<any> {
+  async submitWorkflowSpec(workflowSpec: WorkflowSpec): Promise<ProcessGraph> {
     const msg = {
       msgtype: 'submitworkflowspecmsg',
       spec: workflowSpec,
@@ -340,7 +491,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async getProcessGraph(processGraphId: string): Promise<any> {
+  async getProcessGraph(processGraphId: string): Promise<ProcessGraph> {
     const msg = {
       msgtype: 'getprocessgraphmsg',
       processgraphid: processGraphId,
@@ -348,7 +499,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async getProcessGraphs(colonyName: string, count: number, state?: ProcessState): Promise<any> {
+  async getProcessGraphs(colonyName: string, count: number, state?: ProcessState): Promise<ProcessGraph[]> {
     const msg: any = {
       msgtype: 'getprocessgraphsmsg',
       colonyname: colonyName,
@@ -360,7 +511,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async removeProcessGraph(processGraphId: string): Promise<any> {
+  async removeProcessGraph(processGraphId: string): Promise<void> {
     const msg = {
       msgtype: 'removeprocessgraphmsg',
       processgraphid: processGraphId,
@@ -368,7 +519,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async getProcessesForWorkflow(processGraphId: string, colonyName: string, count: number = 100): Promise<any> {
+  async getProcessesForWorkflow(processGraphId: string, colonyName: string, count: number = 100): Promise<Process[]> {
     const msg = {
       msgtype: 'getprocessesmsg',
       processgraphid: processGraphId,
@@ -379,7 +530,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async removeAllProcessGraphs(colonyName: string, state?: ProcessState): Promise<any> {
+  async removeAllProcessGraphs(colonyName: string, state?: ProcessState): Promise<void> {
     const msg: any = {
       msgtype: 'removeallprocessgraphsmsg',
       colonyname: colonyName,
@@ -392,7 +543,7 @@ export class ColoniesClient {
 
   // ==================== Log Methods ====================
 
-  async addLog(processId: string, message: string, executorPrvKey: string): Promise<any> {
+  async addLog(processId: string, message: string, executorPrvKey: string): Promise<void> {
     const originalKey = this.privateKey;
     this.setPrivateKey(executorPrvKey);
 
@@ -410,7 +561,7 @@ export class ColoniesClient {
     }
   }
 
-  async getLogs(colonyName: string, processId: string, executorName: string, count: number = 100, since: number = 0): Promise<any> {
+  async getLogs(colonyName: string, processId: string, executorName: string, count: number = 100, since: number = 0): Promise<Log[]> {
     const msg = {
       msgtype: 'getlogsmsg',
       colonyname: colonyName,
@@ -424,21 +575,7 @@ export class ColoniesClient {
 
   // ==================== Function Methods ====================
 
-  async addFunction(func: {
-    executorname: string;
-    executortype: string;
-    colonyname: string;
-    funcname: string;
-    description?: string;
-    locationname?: string;
-    args?: Array<{
-      name: string;
-      type: string;
-      description?: string;
-      required?: boolean;
-      enum?: string[];
-    }>;
-  }): Promise<any> {
+  async addFunction(func: ColonyFunction): Promise<ColonyFunction> {
     const msg = {
       msgtype: 'addfunctionmsg',
       fun: func,
@@ -446,7 +583,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async getFunctions(executorName: string, colonyName: string): Promise<any> {
+  async getFunctions(executorName: string, colonyName: string): Promise<ColonyFunction[]> {
     const msg = {
       msgtype: 'getfunctionsmsg',
       executorname: executorName,
@@ -457,7 +594,7 @@ export class ColoniesClient {
 
   // ==================== Cron Methods ====================
 
-  async getCrons(colonyName: string, count: number = 100): Promise<any> {
+  async getCrons(colonyName: string, count: number = 100): Promise<Cron[]> {
     const msg = {
       msgtype: 'getcronsmsg',
       colonyname: colonyName,
@@ -466,7 +603,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async getCron(cronId: string): Promise<any> {
+  async getCron(cronId: string): Promise<Cron> {
     const msg = {
       msgtype: 'getcronmsg',
       cronid: cronId,
@@ -474,7 +611,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async addCron(cronSpec: any): Promise<any> {
+  async addCron(cronSpec: Cron): Promise<Cron> {
     const msg = {
       msgtype: 'addcronmsg',
       cron: cronSpec,
@@ -482,7 +619,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async removeCron(cronId: string): Promise<any> {
+  async removeCron(cronId: string): Promise<void> {
     const msg = {
       msgtype: 'removecronmsg',
       cronid: cronId,
@@ -490,7 +627,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async runCron(cronId: string): Promise<any> {
+  async runCron(cronId: string): Promise<void> {
     const msg = {
       msgtype: 'runcronmsg',
       cronid: cronId,
@@ -500,7 +637,7 @@ export class ColoniesClient {
 
   // ==================== Generator Methods ====================
 
-  async getGenerators(colonyName: string, count: number = 100): Promise<any> {
+  async getGenerators(colonyName: string, count: number = 100): Promise<Generator[]> {
     const msg = {
       msgtype: 'getgeneratorsmsg',
       colonyname: colonyName,
@@ -509,7 +646,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async getGenerator(generatorId: string): Promise<any> {
+  async getGenerator(generatorId: string): Promise<Generator> {
     const msg = {
       msgtype: 'getgeneratormsg',
       generatorid: generatorId,
@@ -517,7 +654,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async addGenerator(generatorSpec: any): Promise<any> {
+  async addGenerator(generatorSpec: Generator): Promise<Generator> {
     const msg = {
       msgtype: 'addgeneratormsg',
       generator: generatorSpec,
@@ -527,7 +664,7 @@ export class ColoniesClient {
 
   // ==================== User Methods ====================
 
-  async getUsers(colonyName: string): Promise<any> {
+  async getUsers(colonyName: string): Promise<User[]> {
     const msg = {
       msgtype: 'getusersmsg',
       colonyname: colonyName,
@@ -535,13 +672,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async addUser(user: {
-    colonyname: string;
-    userid: string;
-    name: string;
-    email: string;
-    phone: string;
-  }): Promise<any> {
+  async addUser(user: User): Promise<User> {
     const msg = {
       msgtype: 'addusermsg',
       user,
@@ -549,7 +680,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async removeUser(colonyName: string, name: string): Promise<any> {
+  async removeUser(colonyName: string, name: string): Promise<void> {
     const msg = {
       msgtype: 'removeusermsg',
       colonyname: colonyName,
@@ -560,7 +691,7 @@ export class ColoniesClient {
 
   // ==================== File Methods ====================
 
-  async getFileLabels(colonyName: string, name: string = '', exact: boolean = false): Promise<any> {
+  async getFileLabels(colonyName: string, name: string = '', exact: boolean = false): Promise<string[]> {
     const msg = {
       msgtype: 'getfilelabelsmsg',
       colonyname: colonyName,
@@ -570,7 +701,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async getFiles(colonyName: string, label: string): Promise<any> {
+  async getFiles(colonyName: string, label: string): Promise<ColonyFile[]> {
     const msg = {
       msgtype: 'getfilesmsg',
       colonyname: colonyName,
@@ -582,7 +713,7 @@ export class ColoniesClient {
   async getFile(
     colonyName: string,
     options: { fileId: string } | { name: string; label: string; latest?: boolean }
-  ): Promise<any> {
+  ): Promise<ColonyFile> {
     const msg: any = {
       msgtype: 'getfilemsg',
       colonyname: colonyName,
@@ -605,27 +736,7 @@ export class ColoniesClient {
    * Register a file in ColonyFS
    * @param file - File metadata including colony, label, name, size, checksum, and S3 reference
    */
-  async addFile(file: {
-    colonyname: string;
-    label: string;
-    name: string;
-    size: number;
-    checksum: string;
-    checksumalg: string;
-    ref: {
-      protocol: string;
-      s3object: {
-        server: string;
-        port: number;
-        tls: boolean;
-        accesskey: string;
-        secretkey: string;
-        region: string;
-        bucket: string;
-        object: string;
-      };
-    };
-  }): Promise<any> {
+  async addFile(file: ColonyFile): Promise<ColonyFile> {
     const msg = {
       msgtype: 'addfilemsg',
       file,
@@ -638,7 +749,7 @@ export class ColoniesClient {
    * @param colonyName - Name of the colony
    * @param fileId - ID of the file to remove
    */
-  async removeFile(colonyName: string, fileId: string): Promise<any> {
+  async removeFile(colonyName: string, fileId: string): Promise<void> {
     const msg = {
       msgtype: 'removefilemsg',
       colonyname: colonyName,
@@ -649,14 +760,7 @@ export class ColoniesClient {
 
   // ==================== Attribute Methods ====================
 
-  async addAttribute(attribute: {
-    targetid: string;
-    targetcolonyname: string;
-    targetprocessgraphid: string;
-    attributetype: number;
-    key: string;
-    value: string;
-  }): Promise<any> {
+  async addAttribute(attribute: Attribute): Promise<Attribute> {
     const msg = {
       msgtype: 'addattributemsg',
       attribute,
@@ -664,7 +768,7 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
-  async getAttribute(attributeId: string): Promise<any> {
+  async getAttribute(attributeId: string): Promise<Attribute> {
     const msg = {
       msgtype: 'getattributemsg',
       attributeid: attributeId,
@@ -688,7 +792,7 @@ export class ColoniesClient {
     sequence: number,
     inReplyTo: number,
     payload: string | Uint8Array
-  ): Promise<any> {
+  ): Promise<void> {
     let payloadBytes: number[];
     if (typeof payload === 'string') {
       const encoder = new TextEncoder();
@@ -720,7 +824,7 @@ export class ColoniesClient {
     channelName: string,
     afterSeq: number,
     limit: number
-  ): Promise<any[]> {
+  ): Promise<ChannelEntry[]> {
     const msg = {
       msgtype: 'channelreadmsg',
       processid: processId,
@@ -774,7 +878,7 @@ export class ColoniesClient {
     channelName: string,
     afterSeq: number,
     timeout: number,
-    onMessage: (entries: any[]) => void,
+    onMessage: (entries: ChannelEntry[]) => void,
     onError: (error: Error) => void,
     onClose: () => void
   ): WebSocket {
@@ -864,7 +968,7 @@ export class ColoniesClient {
    * Add a blueprint definition
    * @param definition - Blueprint definition object
    */
-  async addBlueprintDefinition(definition: any): Promise<any> {
+  async addBlueprintDefinition(definition: BlueprintDefinition): Promise<BlueprintDefinition> {
     const msg = {
       msgtype: 'addblueprintdefinitionmsg',
       blueprintdefinition: definition,
@@ -877,7 +981,7 @@ export class ColoniesClient {
    * @param colonyName - Name of the colony
    * @param name - Name of the blueprint definition
    */
-  async getBlueprintDefinition(colonyName: string, name: string): Promise<any> {
+  async getBlueprintDefinition(colonyName: string, name: string): Promise<BlueprintDefinition> {
     const msg = {
       msgtype: 'getblueprintdefinitionmsg',
       colonyname: colonyName,
@@ -890,7 +994,7 @@ export class ColoniesClient {
    * Get all blueprint definitions in a colony
    * @param colonyName - Name of the colony
    */
-  async getBlueprintDefinitions(colonyName: string): Promise<any[]> {
+  async getBlueprintDefinitions(colonyName: string): Promise<BlueprintDefinition[]> {
     const msg = {
       msgtype: 'getblueprintdefinitionsmsg',
       colonyname: colonyName,
@@ -918,7 +1022,7 @@ export class ColoniesClient {
    * Add a blueprint instance
    * @param blueprint - Blueprint object
    */
-  async addBlueprint(blueprint: any): Promise<any> {
+  async addBlueprint(blueprint: Blueprint): Promise<Blueprint> {
     const msg = {
       msgtype: 'addblueprintmsg',
       blueprint,
@@ -931,7 +1035,7 @@ export class ColoniesClient {
    * @param colonyName - Name of the colony (namespace)
    * @param name - Name of the blueprint
    */
-  async getBlueprint(colonyName: string, name: string): Promise<any> {
+  async getBlueprint(colonyName: string, name: string): Promise<Blueprint> {
     const msg = {
       msgtype: 'getblueprintmsg',
       namespace: colonyName,
@@ -946,7 +1050,7 @@ export class ColoniesClient {
    * @param kind - Optional kind filter
    * @param location - Optional location filter
    */
-  async getBlueprints(colonyName: string, kind?: string, location?: string): Promise<any[]> {
+  async getBlueprints(colonyName: string, kind?: string, location?: string): Promise<Blueprint[]> {
     const msg: any = {
       msgtype: 'getblueprintsmsg',
       namespace: colonyName,
@@ -961,7 +1065,7 @@ export class ColoniesClient {
    * @param blueprint - Updated blueprint object
    * @param forceGeneration - Force generation bump even if spec unchanged
    */
-  async updateBlueprint(blueprint: any, forceGeneration: boolean = false): Promise<any> {
+  async updateBlueprint(blueprint: Blueprint, forceGeneration: boolean = false): Promise<Blueprint> {
     const msg = {
       msgtype: 'updateblueprintmsg',
       blueprint,
@@ -990,7 +1094,7 @@ export class ColoniesClient {
    * @param name - Name of the blueprint
    * @param status - Status object representing current state
    */
-  async updateBlueprintStatus(colonyName: string, name: string, status: any): Promise<void> {
+  async updateBlueprintStatus(colonyName: string, name: string, status: Record<string, unknown>): Promise<void> {
     const msg = {
       msgtype: 'updateblueprintstatusmsg',
       colonyname: colonyName,
@@ -1006,7 +1110,7 @@ export class ColoniesClient {
    * @param name - Name of the blueprint
    * @param force - Force reconciliation even if no changes detected
    */
-  async reconcileBlueprint(colonyName: string, name: string, force: boolean = false): Promise<any> {
+  async reconcileBlueprint(colonyName: string, name: string, force: boolean = false): Promise<Blueprint> {
     const msg = {
       msgtype: 'reconcileblueprintmsg',
       namespace: colonyName,
@@ -1021,7 +1125,7 @@ export class ColoniesClient {
    * @param blueprintId - ID of the blueprint
    * @param limit - Optional limit on number of history entries to retrieve
    */
-  async getBlueprintHistory(blueprintId: string, limit?: number): Promise<any> {
+  async getBlueprintHistory(blueprintId: string, limit?: number): Promise<Blueprint[]> {
     const msg: any = {
       msgtype: 'getblueprinthistorymsg',
       blueprintid: blueprintId,
@@ -1049,7 +1153,7 @@ export class ColoniesClient {
     processId: string,
     state: number,
     timeout: number,
-    onProcess: (process: any) => void,
+    onProcess: (process: Process) => void,
     onError: (error: Error) => void,
     onClose: () => void
   ): WebSocket {

@@ -1,3 +1,25 @@
 export { Crypto, generatePrivateKey, deriveId, sign } from './crypto';
 export { ColoniesClient, ProcessState } from './client';
-export type { ColoniesClientConfig, FunctionSpec, RPCMessage } from './client';
+export type {
+  ColoniesClientConfig,
+  RPCMessage,
+  FunctionSpec,
+  WorkflowSpec,
+  Colony,
+  User,
+  Executor,
+  Process,
+  ProcessGraph,
+  FunctionArg,
+  ColonyFunction,
+  ColonyFile,
+  Attribute,
+  Cron,
+  Generator,
+  BlueprintMetadata,
+  BlueprintHandler,
+  BlueprintDefinition,
+  Blueprint,
+  ChannelEntry,
+  Log,
+} from './client';
