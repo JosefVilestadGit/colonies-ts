@@ -1163,6 +1163,13 @@ var ColoniesClient = class {
     return this.sendRPC(this.createRPCMsg(msg));
   }
   // ==================== Function Methods ====================
+  async addFunction(func) {
+    const msg = {
+      msgtype: "addfunctionmsg",
+      fun: func
+    };
+    return this.sendRPC(this.createRPCMsg(msg));
+  }
   async getFunctions(executorName, colonyName) {
     const msg = {
       msgtype: "getfunctionsmsg",

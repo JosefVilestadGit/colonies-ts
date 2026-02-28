@@ -20,7 +20,7 @@ const __dirname = dirname(__filename);
 
 // Configuration from environment
 const config = {
-  port: parseInt(process.env.WEB_PORT || '3000', 10),
+  port: parseInt(process.env.WEB_PORT || '4000', 10),
   reconcilerWsPort: parseInt(process.env.RECONCILER_WS_PORT || '46701', 10),
   colonies: {
     host: process.env.COLONIES_SERVER_HOST || 'localhost',
