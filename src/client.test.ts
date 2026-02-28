@@ -274,6 +274,32 @@ describe('ColoniesClient', () => {
       expect(payload.fun.args[0].name).toBe('unit');
     });
 
+    it('should call cancelProcess with correct message', async () => {
+      fetchSpy.mockResolvedValueOnce(createMockResponse({}));
+
+      await client.cancelProcess('process-123');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+      expect(body.payloadtype).toBe('cancelprocessmsg');
+      const payload = decodePayload(body.payload);
+      expect(payload.msgtype).toBe('cancelprocessmsg');
+      expect(payload.processid).toBe('process-123');
+    });
+
+    it('should call cancelProcessGraph with correct message', async () => {
+      fetchSpy.mockResolvedValueOnce(createMockResponse({}));
+
+      await client.cancelProcessGraph('graph-456');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string);
+      expect(body.payloadtype).toBe('cancelprocessgraphmsg');
+      const payload = decodePayload(body.payload);
+      expect(payload.msgtype).toBe('cancelprocessgraphmsg');
+      expect(payload.processgraphid).toBe('graph-456');
+    });
+
     it('should throw error when private key not set', async () => {
       const noKeyClient = new ColoniesClient({
         host: 'localhost',

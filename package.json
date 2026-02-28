@@ -21,7 +21,7 @@
     "test:watch": "vitest --exclude '**/*.integration.test.ts'",
     "test:integration": "vitest run src/client.integration.test.ts",
     "test:all": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage --exclude '**/*.integration.test.ts'",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"

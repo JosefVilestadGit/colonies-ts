@@ -481,6 +481,14 @@ export class ColoniesClient {
     return this.sendRPC(this.createRPCMsg(msg));
   }
 
+  async cancelProcess(processId: string): Promise<void> {
+    const msg = {
+      msgtype: 'cancelprocessmsg',
+      processid: processId,
+    };
+    await this.sendRPC(this.createRPCMsg(msg));
+  }
+
   // ==================== Workflow Methods ====================
 
   async submitWorkflowSpec(workflowSpec: WorkflowSpec): Promise<ProcessGraph> {
@@ -531,6 +539,15 @@ export class ColoniesClient {
   }
 
   async removeAllProcessGraphs(colonyName: string, state?: ProcessState): Promise<void> {
+  async cancelProcessGraph(processGraphId: string): Promise<void> {
+    const msg = {
+      msgtype: 'cancelprocessgraphmsg',
+      processgraphid: processGraphId,
+    };
+    await this.sendRPC(this.createRPCMsg(msg));
+  }
+
+  async removeAllProcessGraphs(colonyName: string, state?: ProcessState): Promise<any> {
     const msg: any = {
       msgtype: 'removeallprocessgraphsmsg',
       colonyname: colonyName,
